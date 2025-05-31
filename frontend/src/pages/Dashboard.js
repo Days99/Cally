@@ -112,15 +112,20 @@ const Dashboard = () => {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600">Google Calendar</span>
-              <span className="text-sm text-green-600 font-medium">Connected</span>
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-green-600 font-medium">✓ Multi-Account</span>
+                <Link to="/accounts" className="text-xs text-blue-600 hover:text-blue-500">
+                  Manage →
+                </Link>
+              </div>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600">Jira</span>
-              <span className="text-sm text-gray-400">Coming Soon</span>
+              <span className="text-sm text-amber-600 font-medium">🔄 Starting Phase 4</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600">GitHub</span>
-              <span className="text-sm text-gray-400">Coming Soon</span>
+              <span className="text-sm text-gray-400">Phase 5</span>
             </div>
           </div>
         </div>
@@ -231,6 +236,21 @@ const Dashboard = () => {
                 <p className="text-sm text-gray-600">Manage integrations</p>
               </div>
             </Link>
+
+            <Link 
+              to="/accounts"
+              className="flex items-center p-3 bg-purple-50 rounded-md hover:bg-purple-100 transition-colors"
+            >
+              <div className="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center mr-3 flex-shrink-0">
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-gray-900">Manage Accounts</p>
+                <p className="text-sm text-gray-600">Add or configure integrations</p>
+              </div>
+            </Link>
           </div>
         </div>
       </div>
@@ -240,31 +260,35 @@ const Dashboard = () => {
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Development Progress</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-green-50 border border-green-200 rounded-md p-4">
-            <h4 className="font-medium text-green-900 mb-2">✅ Completed</h4>
+            <h4 className="font-medium text-green-900 mb-2">✅ Completed (Phases 1-3)</h4>
             <ul className="text-sm text-green-700 space-y-1">
               <li>• Google OAuth Authentication</li>
               <li>• Database Schema & Models</li>
               <li>• Google Calendar Integration</li>
               <li>• Calendar UI with FullCalendar</li>
               <li>• Event Sync & Management</li>
+              <li>• Multi-Account Support</li>
+              <li>• Account Management Dashboard</li>
             </ul>
           </div>
           
-          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
-            <h4 className="font-medium text-yellow-900 mb-2">🔄 In Progress</h4>
-            <ul className="text-sm text-yellow-700 space-y-1">
-              <li>• Calendar Event Display</li>
-              <li>• Real-time Sync Status</li>
-              <li>• Event Creation Interface</li>
+          <div className="bg-amber-50 border border-amber-200 rounded-md p-4">
+            <h4 className="font-medium text-amber-900 mb-2">🔄 Phase 4: Jira Integration</h4>
+            <ul className="text-sm text-amber-700 space-y-1">
+              <li>• Jira OAuth Setup</li>
+              <li>• Issue Fetching Service</li>
+              <li>• Task Display Interface</li>
+              <li>• Issue Status Management</li>
+              <li>• Calendar-Task Sync</li>
             </ul>
           </div>
           
           <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-            <h4 className="font-medium text-blue-900 mb-2">📋 Next Phases</h4>
+            <h4 className="font-medium text-blue-900 mb-2">📋 Upcoming Phases</h4>
             <ul className="text-sm text-blue-700 space-y-1">
-              <li>• Jira Integration (Phase 4)</li>
               <li>• GitHub Integration (Phase 5)</li>
-              <li>• Drag & Drop Tasks (Phase 6)</li>
+              <li>• Drag & Drop Interface (Phase 6)</li>
+              <li>• Advanced Filtering (Phase 7)</li>
               <li>• Mobile Optimization (Phase 8)</li>
             </ul>
           </div>

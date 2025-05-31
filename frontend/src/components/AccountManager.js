@@ -95,6 +95,36 @@ const AccountManager = () => {
         console.error('Error adding account:', error);
         setAddingAccount(null);
       }
+    } else if (provider === 'jira') {
+      try {
+        setAddingAccount(provider);
+        
+        const response = await fetch(`${API_URL}/api/jira/auth`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+          },
+          body: JSON.stringify({
+            accountName: newAccountName || `${provider} Account`
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Store current location for redirect after OAuth
+          localStorage.setItem('oauth_return_url', window.location.pathname);
+          
+          // Redirect to Jira OAuth
+          window.location.href = data.authUrl;
+        } else {
+          throw new Error('Failed to initiate Jira account addition');
+        }
+      } catch (error) {
+        console.error('Error adding Jira account:', error);
+        setAddingAccount(null);
+      }
     }
   };
 
@@ -364,13 +394,14 @@ const AccountManager = () => {
           </button>
 
           <button
-            disabled
-            className="flex items-center justify-center p-4 border-2 border-dashed border-gray-200 rounded-lg bg-gray-100 cursor-not-allowed"
+            onClick={() => handleAddAccount('jira')}
+            disabled={addingAccount === 'jira'}
+            className="flex items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors disabled:opacity-50"
           >
             <div className="text-center">
-              <span className="text-2xl mb-2 block opacity-50">📋</span>
-              <span className="text-sm font-medium text-gray-500">Jira</span>
-              <p className="text-xs text-gray-400 mt-1">Coming soon</p>
+              <span className="text-2xl mb-2 block">📋</span>
+              <span className="text-sm font-medium text-gray-900">Jira</span>
+              <p className="text-xs text-gray-500 mt-1">{addingAccount === 'jira' ? 'Connecting...' : 'Connect your issues'}</p>
             </div>
           </button>
 

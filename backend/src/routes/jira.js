@@ -1,0 +1,21 @@
+const express = require('express');
+const router = express.Router();
+const { authenticateToken } = require('../middleware/auth');
+const jiraController = require('../controllers/jiraController');
+
+// Jira OAuth callback (public route)
+router.get('/callback', jiraController.callback);
+
+// All other routes require authentication
+router.use(authenticateToken);
+
+// Jira OAuth routes
+router.post('/auth', jiraController.getAuthUrl);
+
+// Issue management routes
+router.get('/issues', jiraController.getAllIssues);
+router.get('/issues/:accountId', jiraController.getIssues);
+router.put('/issues/:accountId/:issueKey/status', jiraController.updateIssueStatus);
+router.get('/issues/:accountId/:issueKey/transitions', jiraController.getIssueTransitions);
+
+module.exports = router; 

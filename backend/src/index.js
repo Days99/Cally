@@ -31,6 +31,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/accounts', require('./routes/accounts'));
 app.use('/api/calendar', require('./routes/calendar'));
+app.use('/api/jira', require('./routes/jira'));
 app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/integrations', require('./routes/integrations'));
 
