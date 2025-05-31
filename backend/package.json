@@ -7,33 +7,34 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "test": "jest",
-    "migrate": "node scripts/migrate.js",
-    "seed": "node scripts/seed.js"
+    "migrate": "node ../scripts/migrate.js",
+    "seed": "node ../scripts/seed.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
-    "helmet": "^7.1.0",
-    "morgan": "^1.10.0",
-    "dotenv": "^16.3.1",
+    "axios": "^1.6.2",
     "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "express-validator": "^7.0.1",
+    "googleapis": "^128.0.0",
+    "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "node-cron": "^3.0.3",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.11.3",
     "pg-hstore": "^2.3.4",
-    "sequelize": "^6.35.1",
-    "axios": "^1.6.2",
-    "node-cron": "^3.0.3",
-    "express-rate-limit": "^7.1.5",
-    "express-validator": "^7.0.1"
+    "sequelize": "^6.35.1"
   },
   "devDependencies": {
-    "nodemon": "^3.0.2",
+    "@types/jest": "^29.5.8",
     "jest": "^29.7.0",
-    "supertest": "^6.3.3",
-    "@types/jest": "^29.5.8"
+    "nodemon": "^3.0.2",
+    "supertest": "^6.3.3"
   },
   "keywords": [
     "calendar",
@@ -45,4 +46,4 @@
   ],
   "author": "Cally Team",
   "license": "MIT"
-} 
+}
