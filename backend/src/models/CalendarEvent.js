@@ -64,6 +64,10 @@ const CalendarEvent = sequelize.define('CalendarEvent', {
     type: DataTypes.JSONB,
     allowNull: true
   },
+  htmlLink: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
   lastSyncAt: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW

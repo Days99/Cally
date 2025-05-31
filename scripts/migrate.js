@@ -15,6 +15,18 @@ async function migrate() {
     await sequelize.sync({ force: false });
     console.log('✅ Database tables created successfully.');
     
+    // Add htmlLink column if it doesn't exist
+    console.log('🔧 Adding missing columns...');
+    try {
+      await sequelize.query(`
+        ALTER TABLE calendar_events 
+        ADD COLUMN IF NOT EXISTS "htmlLink" VARCHAR(255);
+      `);
+      console.log('✅ htmlLink column added to calendar_events table');
+    } catch (error) {
+      console.log('ℹ️  htmlLink column already exists or not needed');
+    }
+    
     console.log('📊 Created tables:');
     console.log('  - users');
     console.log('  - tokens');

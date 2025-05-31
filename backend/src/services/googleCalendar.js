@@ -160,6 +160,7 @@ class GoogleCalendarService {
         status: googleEvent.status || 'confirmed',
         visibility: googleEvent.visibility || 'default',
         recurrence: googleEvent.recurrence || null,
+        htmlLink: googleEvent.htmlLink || null,
         lastSyncAt: new Date()
       };
 
