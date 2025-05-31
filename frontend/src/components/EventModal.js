@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import calendarService from '../services/calendarService';
 import accountService from '../services/accountService';
 import eventService from '../services/eventService';
 
 const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, isCreating = false, defaultDate = null }) => {
   const [isEditing, setIsEditing] = useState(isCreating);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
     eventType: 'manual',
@@ -22,10 +21,20 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
     googleCalendarId: 'primary',
     assignee: '',
     labels: [],
-    status: 'confirmed'
+    status: 'confirmed',
+    accountId: '',
+    // Association types
+    jiraAssociationType: 'create',
+    existingJiraKey: '',
+    githubAssociationType: 'create',
+    githubRepository: '',
+    githubIssueNumber: '',
+    githubLabels: '',
+    githubAssignee: ''
   });
   const [error, setError] = useState(null);
   const [accounts, setAccounts] = useState([]);
+  const [accountsLoaded, setAccountsLoaded] = useState(false);
 
   // Event type configurations
   const eventTypes = {
@@ -63,6 +72,37 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
     { value: 'lowest', label: 'Lowest', color: 'text-gray-600' }
   ];
 
+  const getEventType = useCallback(() => {
+    // First check if event type is already determined
+    if (event?.extendedProps?.eventType) {
+      return event.extendedProps.eventType;
+    }
+    
+    // Fallback to detection logic
+    if (event?.extendedProps?.googleEventId) return 'google_calendar';
+    if (event?.extendedProps?.jiraKey) return 'jira_task';
+    if (event?.extendedProps?.githubIssue) return 'github_issue';
+    return 'manual';
+  }, [event]);
+
+  const loadAccounts = useCallback(async () => {
+    // Only load accounts once and when modal is open
+    if (accountsLoaded || !isOpen) return;
+    
+    try {
+      console.log('Loading accounts...');
+      setAccountsLoaded(true); // Set this immediately to prevent multiple calls
+      const accountsData = await accountService.getAccounts();
+      console.log('Loaded accounts:', accountsData);
+      setAccounts(Array.isArray(accountsData) ? accountsData : []);
+    } catch (error) {
+      console.error('Error loading accounts:', error);
+      setError(`Failed to load accounts: ${error.message}`);
+      setAccounts([]); // Ensure accounts is always an array
+      setAccountsLoaded(false); // Reset on error so it can retry later
+    }
+  }, [isOpen, accountsLoaded]);
+
   useEffect(() => {
     if (isOpen) {
       loadAccounts();
@@ -88,8 +128,8 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
         // Creating new event
         console.log('Creating new event with defaultDate:', defaultDate);
         
-        // Ensure we always have a valid date
-        const baseDate = defaultDate ? new Date(defaultDate) : new Date();
+        // Ensure we always have a valid date - using let to allow reassignment
+        let baseDate = defaultDate ? new Date(defaultDate) : new Date();
         console.log('Base date for new event:', baseDate);
         
         // Validate the date
@@ -117,25 +157,27 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
           googleCalendarId: 'primary',
           assignee: '',
           labels: [],
-          status: 'confirmed'
+          status: 'confirmed',
+          accountId: '',
+          // Association types
+          jiraAssociationType: 'create',
+          existingJiraKey: '',
+          githubAssociationType: 'create',
+          githubRepository: '',
+          githubIssueNumber: '',
+          githubLabels: '',
+          githubAssignee: ''
         });
         setIsEditing(true);
       }
       setError(null);
+    } else {
+      // Reset state when modal closes
+      setAccountsLoaded(false);
+      setAccounts([]);
+      setError(null);
     }
-  }, [event, isOpen, isCreating, defaultDate]);
-
-  const loadAccounts = async () => {
-    try {
-      const accountsData = await accountService.getAccounts();
-      console.log('Loaded accounts:', accountsData);
-      setAccounts(Array.isArray(accountsData) ? accountsData : []);
-    } catch (error) {
-      console.error('Error loading accounts:', error);
-      setError(`Failed to load accounts: ${error.message}`);
-      setAccounts([]); // Ensure accounts is always an array
-    }
-  };
+  }, [event, isOpen, isCreating, defaultDate, getEventType, loadAccounts]);
 
   const formatDateTimeForInput = (date) => {
     if (!date) {
@@ -160,19 +202,6 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
       console.error('Error formatting date for input:', error, 'Date value:', date);
       return '';
     }
-  };
-
-  const getEventType = () => {
-    // First check if event type is already determined
-    if (event?.extendedProps?.eventType) {
-      return event.extendedProps.eventType;
-    }
-    
-    // Fallback to detection logic
-    if (event?.extendedProps?.googleEventId) return 'google_calendar';
-    if (event?.extendedProps?.jiraKey) return 'jira_task';
-    if (event?.extendedProps?.githubIssue) return 'github_issue';
-    return 'manual';
   };
 
   const getEventTypeDisplay = () => {
@@ -256,13 +285,40 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
 
       // Add event-type specific metadata
       if (formData.eventType === 'jira_task') {
-        eventData.metadata = {
-          projectKey: formData.jiraProjectKey,
-          issueType: formData.jiraIssueType,
-          assignee: formData.assignee
-        };
+        if (formData.jiraAssociationType === 'existing') {
+          eventData.metadata = {
+            associationType: 'existing',
+            existingIssueKey: formData.existingJiraKey,
+            linkExisting: true
+          };
+        } else {
+          eventData.metadata = {
+            associationType: 'create',
+            projectKey: formData.jiraProjectKey,
+            issueType: formData.jiraIssueType,
+            assignee: formData.assignee,
+            createNew: true
+          };
+        }
       } else if (formData.eventType === 'google_calendar') {
         eventData.calendarId = formData.googleCalendarId;
+      } else if (formData.eventType === 'github_issue') {
+        if (formData.githubAssociationType === 'existing') {
+          eventData.metadata = {
+            associationType: 'existing',
+            repository: formData.githubRepository,
+            issueNumber: formData.githubIssueNumber,
+            linkExisting: true
+          };
+        } else {
+          eventData.metadata = {
+            associationType: 'create',
+            repository: formData.githubRepository,
+            labels: formData.githubLabels ? formData.githubLabels.split(',').map(l => l.trim()) : [],
+            assignee: formData.githubAssignee,
+            createNew: true
+          };
+        }
       }
 
       if (isCreating) {
@@ -443,6 +499,14 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                       </option>
                     ))}
                   </select>
+                  {getAvailableAccounts(formData.eventType).length === 0 && (
+                    <p className="text-xs text-red-600 mt-1">
+                      No {formData.eventType.replace('_', ' ')} accounts connected. Please add an account first.
+                    </p>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">
+                    Debug: {accounts.length} total accounts loaded, {getAvailableAccounts(formData.eventType).length} available for {formData.eventType}
+                  </p>
                 </div>
               )}
 
@@ -558,37 +622,103 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
               {formData.eventType === 'jira_task' && (
                 <div className="bg-green-50 border border-green-200 rounded-md p-4">
                   <h4 className="text-sm font-medium text-green-900 mb-3">Jira Task Details</h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-medium text-green-700 mb-1">
-                        Project Key
+                  
+                  {/* Task Association Type */}
+                  <div className="mb-4">
+                    <label className="block text-xs font-medium text-green-700 mb-2">
+                      Task Association
+                    </label>
+                    <div className="flex space-x-4">
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          name="jiraAssociationType"
+                          value="create"
+                          checked={formData.jiraAssociationType === 'create'}
+                          onChange={handleInputChange}
+                          className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300"
+                        />
+                        <span className="ml-2 text-sm text-green-700">Create New Issue</span>
                       </label>
-                      <input
-                        type="text"
-                        name="jiraProjectKey"
-                        value={formData.jiraProjectKey}
-                        onChange={handleInputChange}
-                        placeholder="e.g., PROJ"
-                        className="w-full px-2 py-1 text-sm border border-green-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-green-700 mb-1">
-                        Issue Type
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          name="jiraAssociationType"
+                          value="existing"
+                          checked={formData.jiraAssociationType === 'existing'}
+                          onChange={handleInputChange}
+                          className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300"
+                        />
+                        <span className="ml-2 text-sm text-green-700">Link Existing Issue</span>
                       </label>
-                      <select
-                        name="jiraIssueType"
-                        value={formData.jiraIssueType}
-                        onChange={handleInputChange}
-                        className="w-full px-2 py-1 text-sm border border-green-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
-                      >
-                        <option value="Task">Task</option>
-                        <option value="Story">Story</option>
-                        <option value="Bug">Bug</option>
-                        <option value="Epic">Epic</option>
-                      </select>
                     </div>
                   </div>
+
+                  {formData.jiraAssociationType === 'existing' ? (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-medium text-green-700 mb-1">
+                          Issue Key *
+                        </label>
+                        <input
+                          type="text"
+                          name="existingJiraKey"
+                          value={formData.existingJiraKey || ''}
+                          onChange={handleInputChange}
+                          placeholder="e.g., PROJ-123"
+                          className="w-full px-2 py-1 text-sm border border-green-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                        />
+                        <p className="text-xs text-green-600 mt-1">
+                          Enter the exact Jira issue key (e.g., PROJ-123)
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-green-700 mb-1">
+                          Project Key *
+                        </label>
+                        <input
+                          type="text"
+                          name="jiraProjectKey"
+                          value={formData.jiraProjectKey}
+                          onChange={handleInputChange}
+                          placeholder="e.g., PROJ"
+                          className="w-full px-2 py-1 text-sm border border-green-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-green-700 mb-1">
+                          Issue Type
+                        </label>
+                        <select
+                          name="jiraIssueType"
+                          value={formData.jiraIssueType}
+                          onChange={handleInputChange}
+                          className="w-full px-2 py-1 text-sm border border-green-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                        >
+                          <option value="Task">Task</option>
+                          <option value="Story">Story</option>
+                          <option value="Bug">Bug</option>
+                          <option value="Epic">Epic</option>
+                        </select>
+                      </div>
+                      <div className="col-span-2">
+                        <label className="block text-xs font-medium text-green-700 mb-1">
+                          Assignee
+                        </label>
+                        <input
+                          type="text"
+                          name="assignee"
+                          value={formData.assignee}
+                          onChange={handleInputChange}
+                          placeholder="Username or email"
+                          className="w-full px-2 py-1 text-sm border border-green-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -609,6 +739,119 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                       {/* TODO: Load user's calendars */}
                     </select>
                   </div>
+                </div>
+              )}
+
+              {formData.eventType === 'github_issue' && (
+                <div className="bg-purple-50 border border-purple-200 rounded-md p-4">
+                  <h4 className="text-sm font-medium text-purple-900 mb-3">GitHub Issue Details</h4>
+                  
+                  {/* Issue Association Type */}
+                  <div className="mb-4">
+                    <label className="block text-xs font-medium text-purple-700 mb-2">
+                      Issue Association
+                    </label>
+                    <div className="flex space-x-4">
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          name="githubAssociationType"
+                          value="create"
+                          checked={formData.githubAssociationType === 'create'}
+                          onChange={handleInputChange}
+                          className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300"
+                        />
+                        <span className="ml-2 text-sm text-purple-700">Create New Issue</span>
+                      </label>
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          name="githubAssociationType"
+                          value="existing"
+                          checked={formData.githubAssociationType === 'existing'}
+                          onChange={handleInputChange}
+                          className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300"
+                        />
+                        <span className="ml-2 text-sm text-purple-700">Link Existing Issue</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {formData.githubAssociationType === 'existing' ? (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-medium text-purple-700 mb-1">
+                          Repository *
+                        </label>
+                        <input
+                          type="text"
+                          name="githubRepository"
+                          value={formData.githubRepository || ''}
+                          onChange={handleInputChange}
+                          placeholder="e.g., owner/repo-name"
+                          className="w-full px-2 py-1 text-sm border border-purple-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-purple-700 mb-1">
+                          Issue Number *
+                        </label>
+                        <input
+                          type="number"
+                          name="githubIssueNumber"
+                          value={formData.githubIssueNumber || ''}
+                          onChange={handleInputChange}
+                          placeholder="e.g., 123"
+                          className="w-full px-2 py-1 text-sm border border-purple-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+                        />
+                        <p className="text-xs text-purple-600 mt-1">
+                          Enter the GitHub issue number from the repository
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-medium text-purple-700 mb-1">
+                          Repository *
+                        </label>
+                        <input
+                          type="text"
+                          name="githubRepository"
+                          value={formData.githubRepository || ''}
+                          onChange={handleInputChange}
+                          placeholder="e.g., owner/repo-name"
+                          className="w-full px-2 py-1 text-sm border border-purple-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-purple-700 mb-1">
+                          Labels
+                        </label>
+                        <input
+                          type="text"
+                          name="githubLabels"
+                          value={formData.githubLabels || ''}
+                          onChange={handleInputChange}
+                          placeholder="e.g., bug, enhancement (comma-separated)"
+                          className="w-full px-2 py-1 text-sm border border-purple-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-purple-700 mb-1">
+                          Assignee
+                        </label>
+                        <input
+                          type="text"
+                          name="githubAssignee"
+                          value={formData.githubAssignee || ''}
+                          onChange={handleInputChange}
+                          placeholder="GitHub username"
+                          className="w-full px-2 py-1 text-sm border border-purple-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -743,10 +986,10 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
             {!isEditing && !isCreating && (
               <button
                 onClick={handleDelete}
-                disabled={isDeleting}
+                disabled={isSaving}
                 className="px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-300 rounded-md hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isDeleting ? (
+                {isSaving ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-700 mr-2 inline-block"></div>
                     Deleting...

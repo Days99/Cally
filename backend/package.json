@@ -9,7 +9,11 @@
     "test": "jest",
     "migrate": "node ../scripts/migrate.js",
     "seed": "node ../scripts/seed.js",
-    "reset-calendar": "node ../scripts/reset-calendar.js"
+    "reset-calendar": "node ../scripts/reset-calendar.js",
+    "db:reset": "node ../scripts/reset-database.js",
+    "db:init": "node ../scripts/init-database.js",
+    "db:reset-init": "node ../scripts/reset-and-init.js",
+    "db:fresh": "npm run db:reset-init"
   },
   "dependencies": {
     "axios": "^1.6.2",

@@ -6,9 +6,38 @@ class AccountService {
   // Get all user accounts
   async getAccounts() {
     try {
+      console.log('🔍 DEBUG: accountService.getAccounts() - Making API call to:', `${API_URL}/api/accounts`);
       const response = await axios.get(`${API_URL}/api/accounts`);
-      return response.data.accounts;
+      console.log('🔍 DEBUG: accountService.getAccounts() - Raw response:', response);
+      console.log('🔍 DEBUG: accountService.getAccounts() - Response data:', response.data);
+      console.log('🔍 DEBUG: accountService.getAccounts() - Accounts array:', response.data.accounts);
+      
+      // Handle grouped accounts format from backend
+      const accountsData = response.data.accounts;
+      console.log('🔍 DEBUG: accountService.getAccounts() - Accounts data type:', typeof accountsData);
+      console.log('🔍 DEBUG: accountService.getAccounts() - Is accounts data an array?', Array.isArray(accountsData));
+      
+      if (Array.isArray(accountsData)) {
+        // Already a flat array
+        console.log('🔍 DEBUG: accountService.getAccounts() - Returning flat array:', accountsData);
+        return accountsData;
+      } else if (accountsData && typeof accountsData === 'object') {
+        // Grouped by provider - need to flatten
+        const flattenedAccounts = [];
+        for (const [provider, accounts] of Object.entries(accountsData)) {
+          if (Array.isArray(accounts)) {
+            flattenedAccounts.push(...accounts);
+          }
+        }
+        console.log('🔍 DEBUG: accountService.getAccounts() - Flattened accounts:', flattenedAccounts);
+        return flattenedAccounts;
+      } else {
+        console.log('🔍 DEBUG: accountService.getAccounts() - No accounts data, returning empty array');
+        return [];
+      }
     } catch (error) {
+      console.error('🔍 DEBUG: accountService.getAccounts() - Error occurred:', error);
+      console.error('🔍 DEBUG: accountService.getAccounts() - Error response:', error.response);
       throw new Error(error.response?.data?.message || 'Failed to fetch accounts');
     }
   }
@@ -92,4 +121,5 @@ class AccountService {
   }
 }
 
-export default new AccountService(); 
+const accountService = new AccountService();
+export default accountService; 

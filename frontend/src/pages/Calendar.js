@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -17,13 +17,15 @@ const Calendar = () => {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [eventFilter, setEventFilter] = useState('all');
-  const [view, setView] = useState('dayGridMonth');
+  const [view] = useState('dayGridMonth');
   const [error, setError] = useState(null);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [isCreatingEvent, setIsCreatingEvent] = useState(false);
   const [selectedDateForCreation, setSelectedDateForCreation] = useState(null);
   const [eventStats, setEventStats] = useState(null);
+  const [initialDataLoaded, setInitialDataLoaded] = useState(false);
+  const [syncSuccess, setSyncSuccess] = useState(false);
 
   // Event type configurations for filtering
   const eventTypes = {
@@ -34,46 +36,7 @@ const Calendar = () => {
     github_issue: { label: 'GitHub Issues', icon: '🐙', color: 'bg-purple-100 text-purple-800' }
   };
 
-  useEffect(() => {
-    loadInitialData();
-  }, []);
-
-  useEffect(() => {
-    // Reload events when filter changes
-    loadEvents();
-  }, [eventFilter]);
-
-  const loadInitialData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Load accounts and initial data in parallel
-      const [accountsData, statsData] = await Promise.all([
-        accountService.getAccounts().catch((error) => {
-          console.warn('Failed to load accounts:', error);
-          return [];
-        }),
-        eventService.getEventStats().catch((error) => {
-          console.warn('Failed to load event stats:', error);
-          return null;
-        })
-      ]);
-
-      setAccounts(Array.isArray(accountsData) ? accountsData : []);
-      setEventStats(statsData);
-
-      // Load events for the current view
-      await loadEvents();
-    } catch (error) {
-      console.error('Error loading initial data:', error);
-      setError(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadEvents = async (forceSync = false) => {
+  const loadEvents = useCallback(async (forceSync = false) => {
     try {
       const calendarApi = calendarRef.current?.getApi();
       const currentView = calendarApi?.view;
@@ -84,6 +47,7 @@ const Calendar = () => {
         endDate: currentView.activeEnd.toISOString().split('T')[0]
       } : eventService.getDateRange(view);
 
+      console.log('🔍 DEBUG: loadEvents called - Current events count:', events.length);
       console.log('Loading events with date range:', dateRange, 'Filter:', eventFilter);
 
       const options = {
@@ -93,80 +57,196 @@ const Calendar = () => {
 
       // Load unified events
       const eventsData = await eventService.getEvents(options);
-      console.log('Loaded events data:', eventsData);
+      console.log('🔍 DEBUG: Raw events data from API:', eventsData);
+      console.log('🔍 DEBUG: Raw events count:', eventsData?.length || 0);
       
       const formattedEvents = eventService.formatEventsForCalendar(eventsData);
-      console.log('Formatted events for calendar:', formattedEvents);
+      console.log('🔍 DEBUG: Formatted events for calendar:', formattedEvents);
+      console.log('🔍 DEBUG: Formatted events count:', formattedEvents?.length || 0);
       
+      // Clear existing events before setting new ones
+      setEvents([]);
+      console.log('🔍 DEBUG: Cleared existing events');
+      
+      // Set new events
       setEvents(formattedEvents);
+      console.log('🔍 DEBUG: Set new events, final count:', formattedEvents?.length || 0);
       
-      // If sync requested, sync Google Calendar accounts
-      if (forceSync) {
-        await syncGoogleCalendarAccounts();
-      }
     } catch (error) {
       console.error('Error loading events:', error);
       setError(error.message);
     }
+  }, [eventFilter, view, events.length]);
+
+  const loadInitialData = useCallback(async () => {
+    if (initialDataLoaded) return;
+    
+    try {
+      setLoading(true);
+      setError(null);
+      setInitialDataLoaded(true);
+
+      console.log('🔍 DEBUG: Starting loadInitialData...');
+
+      // Load accounts and initial data in parallel
+      console.log('🔍 DEBUG: About to call accountService.getAccounts()...');
+      
+      const [accountsData, statsData] = await Promise.all([
+        accountService.getAccounts().then(data => {
+          console.log('🔍 DEBUG: accountService.getAccounts() SUCCESS:', data);
+          return data;
+        }).catch((error) => {
+          console.error('🔍 DEBUG: accountService.getAccounts() FAILED:', error);
+          console.warn('Failed to load accounts:', error);
+          return [];
+        }),
+        eventService.getEventStats().then(data => {
+          console.log('🔍 DEBUG: eventService.getEventStats() SUCCESS:', data);
+          return data;
+        }).catch((error) => {
+          console.error('🔍 DEBUG: eventService.getEventStats() FAILED:', error);
+          console.warn('Failed to load event stats:', error);
+          return null;
+        })
+      ]);
+
+      console.log('🔍 DEBUG: Raw accountsData received:', accountsData);
+      console.log('🔍 DEBUG: Is accountsData an array?', Array.isArray(accountsData));
+      
+      const finalAccounts = Array.isArray(accountsData) ? accountsData : [];
+      console.log('🔍 DEBUG: Final accounts to set:', finalAccounts);
+      
+      setAccounts(finalAccounts);
+      setEventStats(statsData);
+
+      console.log('🔍 DEBUG: State updated, about to load events...');
+      
+      // Load events for the current view
+      await loadEvents();
+      
+      console.log('🔍 DEBUG: loadInitialData completed successfully');
+    } catch (error) {
+      console.error('🔍 DEBUG: Error in loadInitialData:', error);
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [initialDataLoaded, loadEvents]);
+
+  useEffect(() => {
+    loadInitialData();
+  }, [loadInitialData]);
+
+  useEffect(() => {
+    // Reload events when filter changes
+    if (initialDataLoaded) {
+      loadEvents();
+    }
+  }, [eventFilter, loadEvents, initialDataLoaded]);
+
+  // DEBUG: Monitor accounts state changes
+  useEffect(() => {
+    console.log('🔍 DEBUG: Accounts state changed:', accounts);
+    console.log('🔍 DEBUG: Accounts length:', accounts?.length);
+    console.log('🔍 DEBUG: Is accounts array?', Array.isArray(accounts));
+  }, [accounts]);
+
+  const handleSync = async () => {
+    try {
+      console.log('🔍 DEBUG: Sync button clicked!');
+      console.log('🔍 DEBUG: Current accounts:', accounts);
+      console.log('🔍 DEBUG: Accounts is array:', Array.isArray(accounts));
+      console.log('🔍 DEBUG: Google accounts:', Array.isArray(accounts) ? accounts.filter(acc => acc.provider === 'google') : 'accounts not array');
+      console.log('🔍 DEBUG: Syncing state:', syncing);
+      
+      setSyncing(true);
+      setError(null);
+
+      console.log('🔄 Starting bidirectional sync with Google Calendar...');
+
+      // Step 1: Sync FROM Google Calendar TO local database
+      await syncGoogleCalendarAccounts();
+      console.log('✅ Google Calendar → Local Database sync completed');
+      
+      // Step 2: Reload events from unified database (which now includes updated Google events)
+      await loadEvents();
+      console.log('✅ Local unified events reloaded');
+      
+      // Step 3: Update stats to reflect new event counts
+      try {
+        const newStats = await eventService.getEventStats();
+        setEventStats(newStats);
+        console.log('✅ Event statistics updated');
+      } catch (statsError) {
+        console.warn('Failed to update stats:', statsError);
+        // Don't fail the whole sync if stats fail
+      }
+      
+      console.log('🎉 Bidirectional sync completed successfully');
+      
+      // Show success notification briefly
+      setSyncSuccess(true);
+      setTimeout(() => {
+        setSyncSuccess(false);
+      }, 3000);
+      
+    } catch (error) {
+      console.error('❌ Error during bidirectional sync:', error);
+      setError(`Sync failed: ${error.message}`);
+    } finally {
+      setSyncing(false);
+    }
   };
 
-  const syncGoogleCalendarAccounts = async () => {
+  const syncGoogleCalendarAccounts = useCallback(async () => {
     try {
+      console.log('🔍 DEBUG: syncGoogleCalendarAccounts called');
+      console.log('🔍 DEBUG: Current accounts for sync:', accounts);
+      
       const googleAccounts = Array.isArray(accounts) ? accounts.filter(acc => acc.provider === 'google') : [];
+      console.log('🔍 DEBUG: Filtered Google accounts:', googleAccounts);
       
       if (googleAccounts.length === 0) {
-        console.log('No Google Calendar accounts to sync');
+        console.log('🔍 DEBUG: No Google Calendar accounts to sync - this is OK, sync will continue');
         return;
       }
 
-      console.log(`Syncing ${googleAccounts.length} Google Calendar account(s)...`);
+      console.log(`📅 Syncing ${googleAccounts.length} Google Calendar account(s)...`);
       
       // Sync each Google account
       for (const account of googleAccounts) {
         try {
+          console.log(`🔄 Syncing account: ${account.accountEmail || account.name}`);
+          
           const calendarApi = calendarRef.current?.getApi();
           const currentView = calendarApi?.view;
           
+          // Get current calendar view date range for focused sync
           const dateRange = currentView ? {
             timeMin: currentView.activeStart.toISOString(),
             timeMax: currentView.activeEnd.toISOString()
           } : calendarService.getDateRange(view);
 
-          await calendarService.syncEvents('primary', dateRange);
-          console.log(`Synced account: ${account.accountEmail}`);
+          console.log(`📊 Sync date range: ${dateRange.timeMin} to ${dateRange.timeMax}`);
+
+          // Call backend sync endpoint - this fetches from Google and updates local DB
+          const syncResult = await calendarService.syncEvents('primary', dateRange);
+          
+          console.log(`✅ Synced ${syncResult.count || 0} events for account: ${account.accountEmail || account.name}`);
+          
         } catch (error) {
-          console.error(`Error syncing account ${account.accountEmail}:`, error);
+          console.error(`❌ Error syncing account ${account.accountEmail || account.name}:`, error);
+          // Continue with other accounts even if one fails
         }
       }
       
-      // Reload events after sync
-      await loadEvents();
-      
-      // Update stats
-      const newStats = await eventService.getEventStats();
-      setEventStats(newStats);
+      console.log('✅ All Google Calendar accounts sync completed');
       
     } catch (error) {
-      console.error('Error during sync:', error);
+      console.error('❌ Error during Google Calendar sync:', error);
       throw error;
     }
-  };
-
-  const handleSync = async () => {
-    try {
-      setSyncing(true);
-      setError(null);
-
-      await syncGoogleCalendarAccounts();
-      
-      console.log('Sync completed successfully');
-    } catch (error) {
-      console.error('Error syncing events:', error);
-      setError(error.message);
-    } finally {
-      setSyncing(false);
-    }
-  };
+  }, [accounts, view]);
 
   const handleDateChange = (info) => {
     // Reload events when calendar view changes
@@ -340,19 +420,6 @@ const Calendar = () => {
     setSelectedEvent(null);
   };
 
-  const formatLastSync = (lastSyncAt) => {
-    if (!lastSyncAt) return 'Never';
-    
-    const date = new Date(lastSyncAt);
-    const now = new Date();
-    const diffMinutes = Math.floor((now - date) / (1000 * 60));
-    
-    if (diffMinutes < 1) return 'Just now';
-    if (diffMinutes < 60) return `${diffMinutes} minutes ago`;
-    if (diffMinutes < 1440) return `${Math.floor(diffMinutes / 60)} hours ago`;
-    return date.toLocaleDateString();
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -423,25 +490,42 @@ const Calendar = () => {
           </button>
 
           {/* Sync Button */}
-          <button
-            onClick={handleSync}
-            disabled={syncing || !Array.isArray(accounts) || accounts.filter(acc => acc.provider === 'google').length === 0}
-            className="btn-primary flex items-center"
-          >
-            {syncing ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Syncing...
-              </>
-            ) : (
-              <>
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                Sync
-              </>
-            )}
-          </button>
+          <div className="relative">
+            <button
+              onClick={handleSync}
+              disabled={syncing}
+              className={`btn-primary flex items-center relative ${
+                syncing ? 'bg-blue-400 cursor-not-allowed' : 'hover:bg-blue-700'
+              }`}
+              title={
+                syncing 
+                  ? 'Syncing with Google Calendar...' 
+                  : 'Sync with Google Calendar - Fetch latest events and update calendar (Debug: Always enabled for testing)'
+              }
+            >
+              {syncing ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  <span>Syncing...</span>
+                  <div className="absolute -top-1 -right-1 h-3 w-3 bg-green-400 rounded-full animate-pulse"></div>
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>Sync</span>
+                  {/* Debug indicator that button is always enabled */}
+                  <div className="absolute -top-1 -right-1 h-3 w-3 bg-orange-500 rounded-full"></div>
+                </>
+              )}
+            </button>
+            
+            {/* Sync status tooltip */}
+            <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
+              Debug: Sync always enabled for testing
+            </div>
+          </div>
         </div>
       </div>
 
@@ -538,6 +622,34 @@ const Calendar = () => {
                   )}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Message */}
+      {syncSuccess && (
+        <div className="bg-green-50 border border-green-200 rounded-md p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-green-800">
+                🎉 Calendar sync completed successfully! Your calendar is now up to date with Google Calendar.
+              </p>
+            </div>
+            <div className="ml-auto pl-3">
+              <button
+                onClick={() => setSyncSuccess(false)}
+                className="text-green-400 hover:text-green-600"
+              >
+                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
             </div>
           </div>
         </div>

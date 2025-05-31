@@ -99,6 +99,7 @@ class GoogleCalendarService {
       const existingEvents = await CalendarEvent.findAll({
         where: {
           userId,
+          eventType: 'google_calendar',
           calendarId,
           startTime: {
             [require('sequelize').Op.gte]: new Date(timeMin),
@@ -146,10 +147,27 @@ class GoogleCalendarService {
   // Save individual event to database
   async saveEventToDatabase(userId, calendarId, googleEvent) {
     try {
+      // Get the user's Google token to associate with this event
+      const token = await Token.findOne({
+        where: { 
+          userId, 
+          provider: 'google', 
+          isActive: true 
+        },
+        order: [['isPrimary', 'DESC'], ['createdAt', 'ASC']] // Prefer primary account
+      });
+
+      if (!token) {
+        console.warn(`No Google token found for user ${userId}, creating event without token association`);
+      }
+
       const eventData = {
         userId,
+        eventType: 'google_calendar', // Set as Google Calendar event
         externalId: googleEvent.id,
         calendarId: calendarId,
+        tokenId: token ? token.id : null,
+        accountName: token ? token.accountName : null,
         title: googleEvent.summary || 'No Title',
         description: googleEvent.description || null,
         startTime: this.parseDateTime(googleEvent.start),
@@ -161,21 +179,57 @@ class GoogleCalendarService {
         visibility: googleEvent.visibility || 'default',
         recurrence: googleEvent.recurrence || null,
         htmlLink: googleEvent.htmlLink || null,
+        syncStatus: 'synced', // Mark as synced
+        color: this.getEventColor('google_calendar'), // Set Google Calendar color
+        metadata: {
+          googleEventId: googleEvent.id,
+          calendarId: calendarId,
+          hangoutLink: googleEvent.hangoutLink,
+          conferenceData: googleEvent.conferenceData,
+          creator: googleEvent.creator,
+          organizer: googleEvent.organizer,
+          source: googleEvent.source,
+          transparency: googleEvent.transparency,
+          sequence: googleEvent.sequence,
+          etag: googleEvent.etag
+        },
         lastSyncAt: new Date()
       };
 
-      // Use upsert to handle updates to existing events
-      const [calendarEvent, created] = await CalendarEvent.upsert(eventData, {
-        where: { userId, externalId: googleEvent.id },
-        returning: true
+      // Use findOrCreate to handle duplicates properly
+      const [calendarEvent, created] = await CalendarEvent.findOrCreate({
+        where: { 
+          userId, 
+          externalId: googleEvent.id,
+          eventType: 'google_calendar'
+        },
+        defaults: eventData
       });
 
-      console.log(`${created ? 'Created' : 'Updated'} event: ${eventData.title}`);
+      // If event exists, update it with latest data
+      if (!created) {
+        await calendarEvent.update(eventData);
+        console.log(`Updated existing Google Calendar event: ${eventData.title}`);
+      } else {
+        console.log(`Created new Google Calendar event: ${eventData.title}`);
+      }
+
       return calendarEvent;
     } catch (error) {
-      console.error('Error saving event to database:', error);
+      console.error('Error saving Google Calendar event to database:', error);
       throw error;
     }
+  }
+
+  // Get color for event type
+  getEventColor(eventType) {
+    const colors = {
+      google_calendar: '#4285f4',
+      jira_task: '#0052cc',
+      github_issue: '#6f42c1',
+      manual: '#6b7280'
+    };
+    return colors[eventType] || colors.manual;
   }
 
   // Parse Google Calendar datetime
