@@ -20,6 +20,26 @@ const Token = sequelize.define('Token', {
     type: DataTypes.ENUM('google', 'jira', 'github'),
     allowNull: false
   },
+  accountName: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    comment: 'User-defined name for this account (e.g., "Work", "Personal")'
+  },
+  accountEmail: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    comment: 'Email associated with this account'
+  },
+  accountId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    comment: 'Provider-specific account identifier'
+  },
+  isPrimary: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    comment: 'Whether this is the primary account for this provider'
+  },
   accessToken: {
     type: DataTypes.TEXT,
     allowNull: false
@@ -42,18 +62,24 @@ const Token = sequelize.define('Token', {
   },
   metadata: {
     type: DataTypes.JSONB,
-    defaultValue: {}
+    defaultValue: {},
+    comment: 'Additional provider-specific data'
   }
 }, {
   tableName: 'tokens',
   timestamps: true,
   indexes: [
     {
-      fields: ['userId', 'provider'],
-      unique: true
+      fields: ['userId', 'provider']
     },
     {
-      fields: ['provider']
+      fields: ['userId', 'provider', 'isPrimary']
+    },
+    {
+      fields: ['provider', 'accountEmail']
+    },
+    {
+      fields: ['isActive']
     }
   ]
 });

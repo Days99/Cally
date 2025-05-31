@@ -24,6 +24,21 @@ const CalendarEvent = sequelize.define('CalendarEvent', {
     type: DataTypes.STRING,
     allowNull: false
   },
+  tokenId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    references: {
+      model: 'tokens',
+      key: 'id'
+    },
+    onDelete: 'SET NULL',
+    comment: 'Which account/token this event belongs to'
+  },
+  accountName: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    comment: 'Cached account name for display (e.g., "Work", "Personal")'
+  },
   title: {
     type: DataTypes.STRING,
     allowNull: false
@@ -85,6 +100,15 @@ const CalendarEvent = sequelize.define('CalendarEvent', {
     },
     {
       fields: ['startTime', 'endTime']
+    },
+    {
+      fields: ['tokenId']
+    },
+    {
+      fields: ['userId', 'tokenId']
+    },
+    {
+      fields: ['userId', 'accountName']
     }
   ]
 });

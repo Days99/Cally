@@ -17,6 +17,7 @@ import Settings from './pages/Settings';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import ProtectedRoute from './components/ProtectedRoute';
+import AccountManager from './components/AccountManager';
 
 function App() {
   return (
@@ -39,6 +40,7 @@ function App() {
                       <Route path="/" element={<Dashboard />} />
                       <Route path="/calendar" element={<Calendar />} />
                       <Route path="/tasks" element={<Tasks />} />
+                      <Route path="/accounts" element={<AccountManager />} />
                       <Route path="/settings" element={<Settings />} />
                     </Routes>
                   </main>

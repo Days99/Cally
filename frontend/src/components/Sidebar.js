@@ -8,6 +8,7 @@ const Sidebar = () => {
     { name: 'Dashboard', href: '/', icon: '📊' },
     { name: 'Calendar', href: '/calendar', icon: '📅' },
     { name: 'Tasks', href: '/tasks', icon: '✅' },
+    { name: 'Accounts', href: '/accounts', icon: '👥' },
     { name: 'Settings', href: '/settings', icon: '⚙️' },
   ];
 

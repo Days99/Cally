@@ -23,6 +23,9 @@ TaskAssignment.belongsTo(Task, { foreignKey: 'taskId', as: 'task' });
 CalendarEvent.hasMany(TaskAssignment, { foreignKey: 'calendarEventId', as: 'taskAssignments' });
 TaskAssignment.belongsTo(CalendarEvent, { foreignKey: 'calendarEventId', as: 'calendarEvent' });
 
+Token.hasMany(CalendarEvent, { foreignKey: 'tokenId', as: 'calendarEvents' });
+CalendarEvent.belongsTo(Token, { foreignKey: 'tokenId', as: 'token' });
+
 module.exports = {
   User,
   Token,

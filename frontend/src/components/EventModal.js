@@ -55,15 +55,37 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted }) 
 
   const getEventTypeDisplay = () => {
     const type = getEventType();
+    const accountInfo = event?.extendedProps?.account;
+    
     switch (type) {
       case 'google':
-        return { label: 'Google Calendar Event', color: 'bg-blue-100 text-blue-800', icon: '📅' };
+        return { 
+          label: 'Google Calendar Event', 
+          color: 'bg-blue-100 text-blue-800', 
+          icon: '📅',
+          account: accountInfo
+        };
       case 'jira':
-        return { label: 'Jira Task', color: 'bg-green-100 text-green-800', icon: '📋' };
+        return { 
+          label: 'Jira Task', 
+          color: 'bg-green-100 text-green-800', 
+          icon: '📋',
+          account: accountInfo
+        };
       case 'github':
-        return { label: 'GitHub Issue', color: 'bg-purple-100 text-purple-800', icon: '🐙' };
+        return { 
+          label: 'GitHub Issue', 
+          color: 'bg-purple-100 text-purple-800', 
+          icon: '🐙',
+          account: accountInfo
+        };
       default:
-        return { label: 'Calendar Event', color: 'bg-gray-100 text-gray-800', icon: '📆' };
+        return { 
+          label: 'Calendar Event', 
+          color: 'bg-gray-100 text-gray-800', 
+          icon: '📆',
+          account: accountInfo
+        };
     }
   };
 
@@ -162,9 +184,19 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted }) 
               <h2 className="text-xl font-semibold text-gray-900">
                 {isEditing ? 'Edit Event' : 'Event Details'}
               </h2>
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${eventTypeDisplay.color}`}>
-                {eventTypeDisplay.label}
-              </span>
+              <div className="flex items-center space-x-2 mt-1">
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${eventTypeDisplay.color}`}>
+                  {eventTypeDisplay.label}
+                </span>
+                {eventTypeDisplay.account && (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                    👥 {eventTypeDisplay.account.name || eventTypeDisplay.account.email}
+                    {eventTypeDisplay.account.isPrimary && (
+                      <span className="ml-1 text-yellow-600">★</span>
+                    )}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <button

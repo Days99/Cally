@@ -10,8 +10,10 @@ class GoogleAuthService {
     );
   }
 
-  // Generate Google OAuth URL
-  getAuthUrl() {
+  // Generate Google OAuth URL with multi-account support
+  getAuthUrl(options = {}) {
+    const { isAdditionalAccount = false, accountName = null } = options;
+    
     const scopes = [
       'https://www.googleapis.com/auth/userinfo.profile',
       'https://www.googleapis.com/auth/userinfo.email',
@@ -19,11 +21,17 @@ class GoogleAuthService {
       'https://www.googleapis.com/auth/calendar.events'
     ];
 
-    return this.oauth2Client.generateAuthUrl({
+    const authUrl = this.oauth2Client.generateAuthUrl({
       access_type: 'offline',
       scope: scopes,
-      prompt: 'consent'
+      prompt: 'consent',
+      state: JSON.stringify({
+        isAdditionalAccount,
+        accountName
+      })
     });
+
+    return authUrl;
   }
 
   // Exchange authorization code for tokens
@@ -57,53 +65,98 @@ class GoogleAuthService {
     }
   }
 
-  // Create or update user and tokens
-  async createOrUpdateUser(userInfo, tokens) {
+  // Create or update user and tokens with multi-account support
+  async createOrUpdateUser(userInfo, tokens, options = {}) {
     try {
-      // Find or create user
-      let user = await User.findOne({ where: { googleId: userInfo.googleId } });
-      
-      if (!user) {
-        // Check if user exists with same email
-        user = await User.findOne({ where: { email: userInfo.email } });
+      const { isAdditionalAccount = false, accountName = null, userId = null } = options;
+      let user;
+
+      if (isAdditionalAccount && userId) {
+        // Adding additional account to existing user
+        user = await User.findByPk(userId);
+        if (!user) {
+          throw new Error('User not found for additional account');
+        }
+      } else {
+        // Find or create user for primary account
+        user = await User.findOne({ where: { googleId: userInfo.googleId } });
         
-        if (user) {
-          // Update existing user with Google ID
-          await user.update({
-            googleId: userInfo.googleId,
-            name: userInfo.name,
-            avatar: userInfo.avatar,
-            lastLoginAt: new Date()
-          });
+        if (!user) {
+          // Check if user exists with same email
+          user = await User.findOne({ where: { email: userInfo.email } });
+          
+          if (user) {
+            // Update existing user with Google ID
+            await user.update({
+              googleId: userInfo.googleId,
+              name: userInfo.name,
+              avatar: userInfo.avatar,
+              lastLoginAt: new Date()
+            });
+          } else {
+            // Create new user
+            user = await User.create({
+              googleId: userInfo.googleId,
+              email: userInfo.email,
+              name: userInfo.name,
+              avatar: userInfo.avatar,
+              lastLoginAt: new Date()
+            });
+          }
         } else {
-          // Create new user
-          user = await User.create({
-            googleId: userInfo.googleId,
-            email: userInfo.email,
+          // Update existing user
+          await user.update({
             name: userInfo.name,
             avatar: userInfo.avatar,
             lastLoginAt: new Date()
           });
         }
-      } else {
-        // Update existing user
-        await user.update({
-          name: userInfo.name,
-          avatar: userInfo.avatar,
-          lastLoginAt: new Date()
-        });
       }
 
-      // Store or update Google tokens
-      await Token.upsert({
+      // Check if this is the first account for this provider
+      const existingTokens = await Token.count({
+        where: { userId: user.id, provider: 'google', isActive: true }
+      });
+      const isPrimary = existingTokens === 0;
+
+      // Store Google tokens for this account
+      const tokenData = {
         userId: user.id,
         provider: 'google',
+        accountName: accountName || (isPrimary ? 'Primary' : userInfo.email),
+        accountEmail: userInfo.email,
+        accountId: userInfo.googleId,
+        isPrimary,
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token,
         expiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
         scope: tokens.scope,
         isActive: true
-      });
+      };
+
+      // For additional accounts, create new token instead of upsert
+      if (isAdditionalAccount) {
+        // Check if this account already exists
+        const existingAccount = await Token.findOne({
+          where: {
+            userId: user.id,
+            provider: 'google',
+            accountEmail: userInfo.email,
+            isActive: true
+          }
+        });
+
+        if (existingAccount) {
+          await existingAccount.update(tokenData);
+        } else {
+          await Token.create(tokenData);
+        }
+      } else {
+        // For primary accounts, use upsert
+        await Token.upsert(tokenData, {
+          where: { userId: user.id, provider: 'google', isPrimary: true }
+        });
+      }
 
       return user;
     } catch (error) {
@@ -112,12 +165,18 @@ class GoogleAuthService {
     }
   }
 
-  // Refresh Google access token
-  async refreshAccessToken(userId) {
+  // Refresh Google access token for specific account
+  async refreshAccessToken(userId, accountId = null) {
     try {
-      const token = await Token.findOne({
-        where: { userId, provider: 'google', isActive: true }
-      });
+      const whereClause = { userId, provider: 'google', isActive: true };
+      
+      if (accountId) {
+        whereClause.id = accountId;
+      } else {
+        whereClause.isPrimary = true;
+      }
+
+      const token = await Token.findOne({ where: whereClause });
 
       if (!token || !token.refreshToken) {
         throw new Error('No refresh token found');
@@ -142,21 +201,27 @@ class GoogleAuthService {
     }
   }
 
-  // Get valid access token for user
-  async getValidAccessToken(userId) {
+  // Get valid access token for user (optionally for specific account)
+  async getValidAccessToken(userId, accountId = null) {
     try {
-      const token = await Token.findOne({
-        where: { userId, provider: 'google', isActive: true }
-      });
+      const whereClause = { userId, provider: 'google', isActive: true };
+      
+      if (accountId) {
+        whereClause.id = accountId;
+      } else {
+        whereClause.isPrimary = true;
+      }
+
+      const token = await Token.findOne({ where: whereClause });
 
       if (!token) {
-        throw new Error('No Google token found for user');
+        throw new Error(`No Google token found for user${accountId ? ' and account' : ''}`);
       }
 
       // Check if token is expired
       if (token.expiresAt && new Date() >= token.expiresAt) {
         // Try to refresh token
-        return await this.refreshAccessToken(userId);
+        return await this.refreshAccessToken(userId, accountId);
       }
 
       return token.accessToken;
@@ -166,22 +231,31 @@ class GoogleAuthService {
     }
   }
 
-  // Revoke Google access
-  async revokeAccess(userId) {
+  // Revoke Google access for specific account or all accounts
+  async revokeAccess(userId, accountId = null) {
     try {
-      const token = await Token.findOne({
-        where: { userId, provider: 'google', isActive: true }
-      });
+      const whereClause = { userId, provider: 'google', isActive: true };
+      
+      if (accountId) {
+        whereClause.id = accountId;
+      }
 
-      if (token) {
-        // Revoke token with Google
-        if (token.accessToken) {
-          this.oauth2Client.setCredentials({ access_token: token.accessToken });
-          await this.oauth2Client.revokeCredentials();
+      const tokens = await Token.findAll({ where: whereClause });
+
+      for (const token of tokens) {
+        try {
+          // Revoke token with Google
+          if (token.accessToken) {
+            this.oauth2Client.setCredentials({ access_token: token.accessToken });
+            await this.oauth2Client.revokeCredentials();
+          }
+
+          // Deactivate token in database
+          await token.update({ isActive: false });
+        } catch (revokeError) {
+          console.error(`Error revoking token for account ${token.id}:`, revokeError);
+          // Continue with other tokens
         }
-
-        // Deactivate token in database
-        await token.update({ isActive: false });
       }
     } catch (error) {
       console.error('Error revoking access:', error);
