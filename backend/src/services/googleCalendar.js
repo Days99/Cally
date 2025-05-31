@@ -224,18 +224,28 @@ class GoogleCalendarService {
     try {
       const calendar = await this.getCalendarClient(userId);
       
+      // Helper function to format datetime for Google Calendar API
+      const formatDateTime = (dateTimeString, isAllDay = false) => {
+        if (isAllDay) {
+          // For all-day events, use just the date part
+          return { date: dateTimeString.split('T')[0] };
+        } else {
+          // For timed events, ensure proper ISO format with timezone
+          const date = new Date(dateTimeString);
+          return { dateTime: date.toISOString() };
+        }
+      };
+
       const event = {
         summary: eventData.title,
         description: eventData.description,
-        start: eventData.isAllDay 
-          ? { date: eventData.startDate }
-          : { dateTime: eventData.startTime },
-        end: eventData.isAllDay
-          ? { date: eventData.endDate }
-          : { dateTime: eventData.endTime },
+        start: formatDateTime(eventData.startTime, eventData.isAllDay),
+        end: formatDateTime(eventData.endTime, eventData.isAllDay),
         location: eventData.location,
         attendees: eventData.attendees
       };
+
+      console.log('Creating Google Calendar event with data:', JSON.stringify(event, null, 2));
 
       const response = await calendar.events.insert({
         calendarId,
@@ -257,17 +267,27 @@ class GoogleCalendarService {
     try {
       const calendar = await this.getCalendarClient(userId);
       
+      // Helper function to format datetime for Google Calendar API
+      const formatDateTime = (dateTimeString, isAllDay = false) => {
+        if (isAllDay) {
+          // For all-day events, use just the date part
+          return { date: dateTimeString.split('T')[0] };
+        } else {
+          // For timed events, ensure proper ISO format with timezone
+          const date = new Date(dateTimeString);
+          return { dateTime: date.toISOString() };
+        }
+      };
+
       const event = {
         summary: eventData.title,
         description: eventData.description,
-        start: eventData.isAllDay 
-          ? { date: eventData.startDate }
-          : { dateTime: eventData.startTime },
-        end: eventData.isAllDay
-          ? { date: eventData.endDate }
-          : { dateTime: eventData.endTime },
+        start: formatDateTime(eventData.startTime, eventData.isAllDay),
+        end: formatDateTime(eventData.endTime, eventData.isAllDay),
         location: eventData.location
       };
+
+      console.log('Updating Google Calendar event with data:', JSON.stringify(event, null, 2));
 
       const response = await calendar.events.update({
         calendarId,

@@ -4,6 +4,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import calendarService from '../services/calendarService';
+import EventModal from '../components/EventModal';
 import { useAuth } from '../hooks/useAuth';
 
 const Calendar = () => {
@@ -17,6 +18,8 @@ const Calendar = () => {
   const [selectedCalendar, setSelectedCalendar] = useState('primary');
   const [view, setView] = useState('dayGridMonth');
   const [error, setError] = useState(null);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [isEventModalOpen, setIsEventModalOpen] = useState(false);
 
   useEffect(() => {
     loadInitialData();
@@ -115,12 +118,138 @@ const Calendar = () => {
   };
 
   const handleEventClick = (info) => {
-    // Open Google Calendar event in new tab
-    if (info.event.url) {
-      window.open(info.event.url, '_blank');
-      info.jsEvent.preventDefault();
+    // Open event details modal instead of directly opening URL
+    setSelectedEvent(info.event);
+    setIsEventModalOpen(true);
+    info.jsEvent.preventDefault();
+  };
+
+  const handleEventUpdated = async () => {
+    // Reload events after an event is updated
+    await loadEvents();
+    // Update sync status
+    const newSyncStatus = await calendarService.getSyncStatus();
+    setSyncStatus(newSyncStatus);
+  };
+
+  const handleEventDeleted = async () => {
+    // Reload events after an event is deleted
+    await loadEvents();
+    // Update sync status
+    const newSyncStatus = await calendarService.getSyncStatus();
+    setSyncStatus(newSyncStatus);
+    // Close modal
+    setIsEventModalOpen(false);
+    setSelectedEvent(null);
+  };
+
+  // Handle event drag and drop
+  const handleEventDrop = async (info) => {
+    try {
+      const event = info.event;
+      const googleEventId = event.extendedProps?.googleEventId;
+      
+      if (!googleEventId) {
+        console.warn('Cannot update event: missing Google Event ID');
+        info.revert(); // Revert the visual change
+        return;
+      }
+
+      // Prepare the updated event data
+      const eventData = {
+        title: event.extendedProps?.originalTitle || event.title,
+        description: event.extendedProps?.description || '',
+        startTime: event.start.toISOString(),
+        endTime: event.end ? event.end.toISOString() : new Date(event.start.getTime() + 60 * 60 * 1000).toISOString(), // Default 1 hour if no end
+        location: event.extendedProps?.location || '',
+        isAllDay: event.allDay
+      };
+
+      console.log('Updating event via drag & drop:', {
+        googleEventId,
+        newStart: event.start,
+        newEnd: event.end,
+        eventData
+      });
+
+      // Update the event in Google Calendar
+      await calendarService.updateEvent(googleEventId, eventData, selectedCalendar);
+      
+      console.log('Event successfully updated via drag & drop');
+      
+      // Update sync status
+      const newSyncStatus = await calendarService.getSyncStatus();
+      setSyncStatus(newSyncStatus);
+      
+    } catch (error) {
+      console.error('Error updating event via drag & drop:', error);
+      setError(`Failed to update event: ${error.message}`);
+      
+      // Revert the visual change since the update failed
+      info.revert();
     }
   };
+
+  // Handle event resize (when user drags the end time)
+  const handleEventResize = async (info) => {
+    try {
+      const event = info.event;
+      const googleEventId = event.extendedProps?.googleEventId;
+      
+      if (!googleEventId) {
+        console.warn('Cannot resize event: missing Google Event ID');
+        info.revert();
+        return;
+      }
+
+      const eventData = {
+        title: event.extendedProps?.originalTitle || event.title,
+        description: event.extendedProps?.description || '',
+        startTime: event.start.toISOString(),
+        endTime: event.end.toISOString(),
+        location: event.extendedProps?.location || '',
+        isAllDay: event.allDay
+      };
+
+      console.log('Resizing event:', {
+        googleEventId,
+        newStart: event.start,
+        newEnd: event.end
+      });
+
+      await calendarService.updateEvent(googleEventId, eventData, selectedCalendar);
+      
+      console.log('Event successfully resized');
+      
+      // Update sync status
+      const newSyncStatus = await calendarService.getSyncStatus();
+      setSyncStatus(newSyncStatus);
+      
+    } catch (error) {
+      console.error('Error resizing event:', error);
+      setError(`Failed to resize event: ${error.message}`);
+      info.revert();
+    }
+  };
+
+  // Handle keyboard shortcuts for event operations
+  const handleKeyDown = (e) => {
+    // Only handle shortcuts when no modal is open and an event is selected
+    if (!isEventModalOpen && selectedEvent) {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        setIsEventModalOpen(true);
+      }
+    }
+  };
+
+  // Add global keyboard event listener
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedEvent, isEventModalOpen]);
 
   const handleDateSelect = (selectInfo) => {
     // Handle date/time selection for creating new events
@@ -174,6 +303,30 @@ const Calendar = () => {
 
   return (
     <div className="space-y-6">
+      {/* Custom CSS for event types */}
+      <style jsx>{`
+        .event-google {
+          border-left: 4px solid #4285f4 !important;
+        }
+        .event-jira {
+          border-left: 4px solid #0052cc !important;
+        }
+        .event-github {
+          border-left: 4px solid #6f42c1 !important;
+        }
+        .event-unknown {
+          border-left: 4px solid #6b7280 !important;
+        }
+        .fc-event:hover {
+          transform: translateY(-1px);
+          transition: transform 0.2s ease;
+          cursor: pointer;
+        }
+        .fc-event-main {
+          padding: 2px 4px;
+        }
+      `}</style>
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -283,6 +436,8 @@ const Calendar = () => {
           weekends={true}
           select={handleDateSelect}
           eventClick={handleEventClick}
+          eventDrop={handleEventDrop}
+          eventResize={handleEventResize}
           datesSet={handleDateChange}
           height="auto"
           eventDisplay="block"
@@ -297,14 +452,43 @@ const Calendar = () => {
       {/* Instructions */}
       <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
         <h3 className="text-sm font-medium text-gray-900 mb-2">Calendar Instructions</h3>
-        <ul className="text-sm text-gray-600 space-y-1">
-          <li>• Click and drag to select time slots and create new events</li>
-          <li>• Click on existing events to open them in Google Calendar</li>
-          <li>• Use the sync button to fetch the latest events from Google</li>
-          <li>• Switch between different calendar views using the toolbar</li>
-          <li>• Events are automatically color-coded with Google's brand colors</li>
-        </ul>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <h4 className="text-xs font-semibold text-gray-700 mb-1">Event Management</h4>
+            <ul className="text-sm text-gray-600 space-y-1">
+              <li>• Click on events to view, edit, or delete them</li>
+              <li>• Click and drag to select time slots and create new events</li>
+              <li>• Drag events to move them to different times/dates</li>
+              <li>• Drag event edges to resize duration</li>
+              <li>• Use <kbd className="px-1 py-0.5 text-xs bg-gray-100 border rounded">Delete</kbd> key to quickly delete selected events</li>
+              <li>• Different event types are color-coded with icons</li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="text-xs font-semibold text-gray-700 mb-1">Event Types</h4>
+            <ul className="text-sm text-gray-600 space-y-1">
+              <li>• 📅 <span className="text-blue-600">Google Calendar</span> events (blue)</li>
+              <li>• 📋 <span className="text-blue-700">Jira Tasks</span> (dark blue)</li>
+              <li>• 🐙 <span className="text-purple-600">GitHub Issues</span> (purple)</li>
+              <li>• Use sync button to fetch latest events from all sources</li>
+            </ul>
+          </div>
+        </div>
       </div>
+
+      {/* Event Modal */}
+      {selectedEvent && (
+        <EventModal
+          event={selectedEvent}
+          isOpen={isEventModalOpen}
+          onClose={() => {
+            setIsEventModalOpen(false);
+            setSelectedEvent(null);
+          }}
+          onEventUpdated={handleEventUpdated}
+          onEventDeleted={handleEventDeleted}
+        />
+      )}
     </div>
   );
 };

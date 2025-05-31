@@ -116,25 +116,68 @@ class CalendarService {
 
   // Helper method to format events for FullCalendar
   formatEventsForCalendar(events) {
-    return events.map(event => ({
-      id: event.id,
-      title: event.title,
-      start: event.startDateTime,
-      end: event.endDateTime,
-      allDay: event.isAllDay,
-      url: event.htmlLink,
-      extendedProps: {
-        description: event.description,
-        location: event.location,
-        status: event.status,
-        hangoutLink: event.hangoutLink,
-        googleEventId: event.googleEventId,
-        lastSyncAt: event.lastSyncAt
-      },
-      backgroundColor: '#4285f4', // Google blue
-      borderColor: '#3367d6',
-      textColor: '#ffffff'
-    }));
+    return events.map(event => {
+      // Determine event type and styling
+      let backgroundColor, borderColor, textColor, icon;
+      
+      if (event.googleEventId) {
+        // Google Calendar events
+        backgroundColor = '#4285f4';
+        borderColor = '#3367d6';
+        textColor = '#ffffff';
+        icon = '📅';
+      } else if (event.jiraKey) {
+        // Jira task events
+        backgroundColor = '#0052cc';
+        borderColor = '#0043a8';
+        textColor = '#ffffff';
+        icon = '📋';
+      } else if (event.githubIssue) {
+        // GitHub issue events
+        backgroundColor = '#6f42c1';
+        borderColor = '#5a2d9d';
+        textColor = '#ffffff';
+        icon = '🐙';
+      } else {
+        // Default/unknown events
+        backgroundColor = '#6b7280';
+        borderColor = '#4b5563';
+        textColor = '#ffffff';
+        icon = '📆';
+      }
+
+      return {
+        id: event.id,
+        title: `${icon} ${event.title}`,
+        start: event.startDateTime,
+        end: event.endDateTime,
+        allDay: event.isAllDay,
+        url: event.htmlLink,
+        extendedProps: {
+          description: event.description,
+          location: event.location,
+          status: event.status,
+          hangoutLink: event.hangoutLink,
+          googleEventId: event.googleEventId,
+          jiraKey: event.jiraKey,
+          githubIssue: event.githubIssue,
+          repository: event.repository,
+          assignee: event.assignee,
+          priority: event.priority,
+          lastSyncAt: event.lastSyncAt,
+          originalTitle: event.title, // Store original title without icon
+          eventType: event.googleEventId ? 'google' : 
+                    event.jiraKey ? 'jira' : 
+                    event.githubIssue ? 'github' : 'unknown'
+        },
+        backgroundColor,
+        borderColor,
+        textColor,
+        classNames: [`event-${event.googleEventId ? 'google' : 
+                      event.jiraKey ? 'jira' : 
+                      event.githubIssue ? 'github' : 'unknown'}`]
+      };
+    });
   }
 
   // Helper method to get date range for calendar view
