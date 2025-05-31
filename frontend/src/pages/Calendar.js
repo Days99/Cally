@@ -4,6 +4,8 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import calendarService from '../services/calendarService';
+import eventService from '../services/eventService';
+import accountService from '../services/accountService';
 import EventModal from '../components/EventModal';
 import { useAuth } from '../hooks/useAuth';
 
@@ -11,33 +13,55 @@ const Calendar = () => {
   const { user } = useAuth();
   const calendarRef = useRef(null);
   const [events, setEvents] = useState([]);
-  const [calendars, setCalendars] = useState([]);
+  const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  const [syncStatus, setSyncStatus] = useState(null);
-  const [selectedCalendar, setSelectedCalendar] = useState('primary');
+  const [eventFilter, setEventFilter] = useState('all');
   const [view, setView] = useState('dayGridMonth');
   const [error, setError] = useState(null);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+  const [isCreatingEvent, setIsCreatingEvent] = useState(false);
+  const [selectedDateForCreation, setSelectedDateForCreation] = useState(null);
+  const [eventStats, setEventStats] = useState(null);
+
+  // Event type configurations for filtering
+  const eventTypes = {
+    all: { label: 'All Events', icon: '📅', color: 'bg-gray-100 text-gray-800' },
+    manual: { label: 'Manual Events', icon: '📆', color: 'bg-gray-100 text-gray-800' },
+    google_calendar: { label: 'Google Calendar', icon: '📅', color: 'bg-blue-100 text-blue-800' },
+    jira_task: { label: 'Jira Tasks', icon: '📋', color: 'bg-green-100 text-green-800' },
+    github_issue: { label: 'GitHub Issues', icon: '🐙', color: 'bg-purple-100 text-purple-800' }
+  };
 
   useEffect(() => {
     loadInitialData();
   }, []);
+
+  useEffect(() => {
+    // Reload events when filter changes
+    loadEvents();
+  }, [eventFilter]);
 
   const loadInitialData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Load calendars and sync status in parallel
-      const [calendarsData, syncStatusData] = await Promise.all([
-        calendarService.getCalendars(),
-        calendarService.getSyncStatus()
+      // Load accounts and initial data in parallel
+      const [accountsData, statsData] = await Promise.all([
+        accountService.getAccounts().catch((error) => {
+          console.warn('Failed to load accounts:', error);
+          return [];
+        }),
+        eventService.getEventStats().catch((error) => {
+          console.warn('Failed to load event stats:', error);
+          return null;
+        })
       ]);
 
-      setCalendars(calendarsData);
-      setSyncStatus(syncStatusData);
+      setAccounts(Array.isArray(accountsData) ? accountsData : []);
+      setEventStats(statsData);
 
       // Load events for the current view
       await loadEvents();
@@ -56,28 +80,75 @@ const Calendar = () => {
       
       // Get date range for current calendar view
       const dateRange = currentView ? {
-        timeMin: currentView.activeStart.toISOString(),
-        timeMax: currentView.activeEnd.toISOString()
-      } : calendarService.getDateRange(view);
+        startDate: currentView.activeStart.toISOString().split('T')[0],
+        endDate: currentView.activeEnd.toISOString().split('T')[0]
+      } : eventService.getDateRange(view);
+
+      console.log('Loading events with date range:', dateRange, 'Filter:', eventFilter);
 
       const options = {
         ...dateRange,
-        sync: forceSync
+        eventType: eventFilter
       };
 
-      const response = await calendarService.getEvents(selectedCalendar, options);
-      const formattedEvents = calendarService.formatEventsForCalendar(response.events);
+      // Load unified events
+      const eventsData = await eventService.getEvents(options);
+      console.log('Loaded events data:', eventsData);
+      
+      const formattedEvents = eventService.formatEventsForCalendar(eventsData);
+      console.log('Formatted events for calendar:', formattedEvents);
       
       setEvents(formattedEvents);
       
+      // If sync requested, sync Google Calendar accounts
       if (forceSync) {
-        // Update sync status after successful sync
-        const newSyncStatus = await calendarService.getSyncStatus();
-        setSyncStatus(newSyncStatus);
+        await syncGoogleCalendarAccounts();
       }
     } catch (error) {
       console.error('Error loading events:', error);
       setError(error.message);
+    }
+  };
+
+  const syncGoogleCalendarAccounts = async () => {
+    try {
+      const googleAccounts = Array.isArray(accounts) ? accounts.filter(acc => acc.provider === 'google') : [];
+      
+      if (googleAccounts.length === 0) {
+        console.log('No Google Calendar accounts to sync');
+        return;
+      }
+
+      console.log(`Syncing ${googleAccounts.length} Google Calendar account(s)...`);
+      
+      // Sync each Google account
+      for (const account of googleAccounts) {
+        try {
+          const calendarApi = calendarRef.current?.getApi();
+          const currentView = calendarApi?.view;
+          
+          const dateRange = currentView ? {
+            timeMin: currentView.activeStart.toISOString(),
+            timeMax: currentView.activeEnd.toISOString()
+          } : calendarService.getDateRange(view);
+
+          await calendarService.syncEvents('primary', dateRange);
+          console.log(`Synced account: ${account.accountEmail}`);
+        } catch (error) {
+          console.error(`Error syncing account ${account.accountEmail}:`, error);
+        }
+      }
+      
+      // Reload events after sync
+      await loadEvents();
+      
+      // Update stats
+      const newStats = await eventService.getEventStats();
+      setEventStats(newStats);
+      
+    } catch (error) {
+      console.error('Error during sync:', error);
+      throw error;
     }
   };
 
@@ -86,24 +157,9 @@ const Calendar = () => {
       setSyncing(true);
       setError(null);
 
-      const calendarApi = calendarRef.current?.getApi();
-      const currentView = calendarApi?.view;
+      await syncGoogleCalendarAccounts();
       
-      const dateRange = currentView ? {
-        timeMin: currentView.activeStart.toISOString(),
-        timeMax: currentView.activeEnd.toISOString()
-      } : calendarService.getDateRange(view);
-
-      console.log('Starting bidirectional sync with Google Calendar...');
-      const response = await calendarService.syncEvents(selectedCalendar, dateRange);
-      console.log('Sync response:', response);
-      
-      await loadEvents(); // Reload events after sync
-      
-      // Show success message with sync details
-      if (response.message) {
-        console.log(`Sync completed: ${response.message}`);
-      }
+      console.log('Sync completed successfully');
     } catch (error) {
       console.error('Error syncing events:', error);
       setError(error.message);
@@ -118,26 +174,27 @@ const Calendar = () => {
   };
 
   const handleEventClick = (info) => {
-    // Open event details modal instead of directly opening URL
+    // Open event details modal
     setSelectedEvent(info.event);
     setIsEventModalOpen(true);
+    setIsCreatingEvent(false);
     info.jsEvent.preventDefault();
   };
 
   const handleEventUpdated = async () => {
     // Reload events after an event is updated
     await loadEvents();
-    // Update sync status
-    const newSyncStatus = await calendarService.getSyncStatus();
-    setSyncStatus(newSyncStatus);
+    // Update stats
+    const newStats = await eventService.getEventStats();
+    setEventStats(newStats);
   };
 
   const handleEventDeleted = async () => {
     // Reload events after an event is deleted
     await loadEvents();
-    // Update sync status
-    const newSyncStatus = await calendarService.getSyncStatus();
-    setSyncStatus(newSyncStatus);
+    // Update stats
+    const newStats = await eventService.getEventStats();
+    setEventStats(newStats);
     // Close modal
     setIsEventModalOpen(false);
     setSelectedEvent(null);
@@ -147,39 +204,40 @@ const Calendar = () => {
   const handleEventDrop = async (info) => {
     try {
       const event = info.event;
-      const googleEventId = event.extendedProps?.googleEventId;
+      const eventType = event.extendedProps?.eventType;
       
-      if (!googleEventId) {
-        console.warn('Cannot update event: missing Google Event ID');
-        info.revert(); // Revert the visual change
-        return;
-      }
-
       // Prepare the updated event data
       const eventData = {
         title: event.extendedProps?.originalTitle || event.title,
         description: event.extendedProps?.description || '',
         startTime: event.start.toISOString(),
-        endTime: event.end ? event.end.toISOString() : new Date(event.start.getTime() + 60 * 60 * 1000).toISOString(), // Default 1 hour if no end
+        endTime: event.end ? event.end.toISOString() : new Date(event.start.getTime() + 60 * 60 * 1000).toISOString(),
         location: event.extendedProps?.location || '',
         isAllDay: event.allDay
       };
 
       console.log('Updating event via drag & drop:', {
-        googleEventId,
+        eventId: event.id,
+        eventType,
         newStart: event.start,
-        newEnd: event.end,
-        eventData
+        newEnd: event.end
       });
 
-      // Update the event in Google Calendar
-      await calendarService.updateEvent(googleEventId, eventData, selectedCalendar);
+      if (eventType === 'google_calendar') {
+        // Update Google Calendar event
+        const googleEventId = event.extendedProps?.googleEventId;
+        const calendarId = event.extendedProps?.calendarId || 'primary';
+        await calendarService.updateEvent(googleEventId, eventData, calendarId);
+      } else {
+        // Update unified event
+        await eventService.updateEvent(event.id, eventData);
+      }
       
       console.log('Event successfully updated via drag & drop');
       
-      // Update sync status
-      const newSyncStatus = await calendarService.getSyncStatus();
-      setSyncStatus(newSyncStatus);
+      // Update stats
+      const newStats = await eventService.getEventStats();
+      setEventStats(newStats);
       
     } catch (error) {
       console.error('Error updating event via drag & drop:', error);
@@ -194,14 +252,8 @@ const Calendar = () => {
   const handleEventResize = async (info) => {
     try {
       const event = info.event;
-      const googleEventId = event.extendedProps?.googleEventId;
+      const eventType = event.extendedProps?.eventType;
       
-      if (!googleEventId) {
-        console.warn('Cannot resize event: missing Google Event ID');
-        info.revert();
-        return;
-      }
-
       const eventData = {
         title: event.extendedProps?.originalTitle || event.title,
         description: event.extendedProps?.description || '',
@@ -212,40 +264,56 @@ const Calendar = () => {
       };
 
       console.log('Resizing event:', {
-        googleEventId,
-        newStart: event.start,
+        eventId: event.id,
+        eventType,
         newEnd: event.end
       });
 
-      await calendarService.updateEvent(googleEventId, eventData, selectedCalendar);
-      
+      if (eventType === 'google_calendar') {
+        // Update Google Calendar event
+        const googleEventId = event.extendedProps?.googleEventId;
+        const calendarId = event.extendedProps?.calendarId || 'primary';
+        await calendarService.updateEvent(googleEventId, eventData, calendarId);
+      } else {
+        // Update unified event
+        await eventService.updateEvent(event.id, eventData);
+      }
+
       console.log('Event successfully resized');
-      
-      // Update sync status
-      const newSyncStatus = await calendarService.getSyncStatus();
-      setSyncStatus(newSyncStatus);
       
     } catch (error) {
       console.error('Error resizing event:', error);
       setError(`Failed to resize event: ${error.message}`);
+      
+      // Revert the visual change since the update failed
       info.revert();
     }
   };
 
-  // Handle keyboard shortcuts for event operations
-  const handleKeyDown = (e) => {
-    // Only handle shortcuts when no modal is open and an event is selected
-    if (!isEventModalOpen && selectedEvent) {
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        e.preventDefault();
-        setIsEventModalOpen(true);
-      }
-    }
-  };
-
-  // Add global keyboard event listener
+  // Handle keyboard shortcuts
   useEffect(() => {
-    document.addEventListener('keydown', handleKeyDown);
+    const handleKeyDown = (e) => {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedEvent && isEventModalOpen) {
+          // Let EventModal handle deletion
+          return;
+        }
+      }
+      if (e.key === 'Escape') {
+        setIsEventModalOpen(false);
+        setSelectedEvent(null);
+        setIsCreatingEvent(false);
+      }
+      if (e.key === 'n' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        handleCreateEvent();
+      }
+    };
+
+    if (isEventModalOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+    }
+
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
@@ -253,28 +321,23 @@ const Calendar = () => {
 
   const handleDateSelect = (selectInfo) => {
     // Handle date/time selection for creating new events
-    const title = prompt('Enter event title:');
-    
-    if (title) {
-      createEvent({
-        title,
-        startTime: selectInfo.start.toISOString(),
-        endTime: selectInfo.end.toISOString(),
-        isAllDay: selectInfo.allDay
-      });
-    }
+    const selectedDate = selectInfo.start;
+    console.log('Date selected for event creation:', selectedDate);
+    setSelectedDateForCreation(selectedDate);
+    setIsCreatingEvent(true);
+    setIsEventModalOpen(true);
+    setSelectedEvent(null);
     
     selectInfo.view.calendar.unselect();
   };
 
-  const createEvent = async (eventData) => {
-    try {
-      await calendarService.createEvent(eventData, selectedCalendar);
-      await loadEvents(); // Reload events after creation
-    } catch (error) {
-      console.error('Error creating event:', error);
-      setError(error.message);
-    }
+  const handleCreateEvent = (defaultDate = null) => {
+    const eventDate = defaultDate || new Date();
+    console.log('Creating event with date:', eventDate);
+    setSelectedDateForCreation(eventDate);
+    setIsCreatingEvent(true);
+    setIsEventModalOpen(true);
+    setSelectedEvent(null);
   };
 
   const formatLastSync = (lastSyncAt) => {
@@ -305,16 +368,16 @@ const Calendar = () => {
     <div className="space-y-6">
       {/* Custom CSS for event types */}
       <style jsx>{`
-        .event-google {
+        .event-google_calendar {
           border-left: 4px solid #4285f4 !important;
         }
-        .event-jira {
+        .event-jira_task {
           border-left: 4px solid #0052cc !important;
         }
-        .event-github {
+        .event-github_issue {
           border-left: 4px solid #6f42c1 !important;
         }
-        .event-unknown {
+        .event-manual {
           border-left: 4px solid #6b7280 !important;
         }
         .fc-event:hover {
@@ -330,29 +393,39 @@ const Calendar = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Calendar</h1>
-          <p className="text-gray-600">View and manage your Google Calendar events</p>
+          <h1 className="text-2xl font-bold text-gray-900">Unified Calendar</h1>
+          <p className="text-gray-600">Manage events from all your connected services</p>
         </div>
         
         <div className="flex items-center space-x-3 mt-4 sm:mt-0">
-          {/* Calendar Selector */}
+          {/* Event Type Filter */}
           <select 
-            value={selectedCalendar}
-            onChange={(e) => setSelectedCalendar(e.target.value)}
+            value={eventFilter}
+            onChange={(e) => setEventFilter(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
-            <option value="primary">Primary Calendar</option>
-            {calendars.map(calendar => (
-              <option key={calendar.id} value={calendar.id}>
-                {calendar.name}
+            {Object.entries(eventTypes).map(([key, type]) => (
+              <option key={key} value={key}>
+                {type.icon} {type.label}
               </option>
             ))}
           </select>
 
+          {/* Create Event Button */}
+          <button
+            onClick={() => handleCreateEvent()}
+            className="btn-secondary flex items-center"
+          >
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Create Event
+          </button>
+
           {/* Sync Button */}
           <button
             onClick={handleSync}
-            disabled={syncing}
+            disabled={syncing || !Array.isArray(accounts) || accounts.filter(acc => acc.provider === 'google').length === 0}
             className="btn-primary flex items-center"
           >
             {syncing ? (
@@ -372,19 +445,98 @@ const Calendar = () => {
         </div>
       </div>
 
-      {/* Sync Status */}
-      {syncStatus && (
+      {/* Event Statistics */}
+      {eventStats && (
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <div className="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center">
+                <span className="text-primary-600 text-sm">📅</span>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-gray-900">Total</p>
+                <p className="text-lg font-semibold text-gray-900">{eventStats.total}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <span className="text-yellow-600 text-sm">🕐</span>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-gray-900">Today</p>
+                <p className="text-lg font-semibold text-gray-900">{eventStats.today}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                <span className="text-green-600 text-sm">⏰</span>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-gray-900">Upcoming</p>
+                <p className="text-lg font-semibold text-gray-900">{eventStats.upcoming}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                <span className="text-blue-600 text-sm">📅</span>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-gray-900">Google</p>
+                <p className="text-lg font-semibold text-gray-900">{eventStats.byType?.google_calendar || 0}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                <span className="text-green-600 text-sm">📋</span>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-gray-900">Jira</p>
+                <p className="text-lg font-semibold text-gray-900">{eventStats.byType?.jira_task || 0}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Connected Accounts Status */}
+      {Array.isArray(accounts) && accounts.length > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <div className="w-3 h-3 bg-green-400 rounded-full mr-3"></div>
               <div>
                 <p className="text-sm font-medium text-blue-900">
-                  Google Calendar Connected
+                  Connected Services ({accounts.length})
                 </p>
-                <p className="text-sm text-blue-700">
-                  Last sync: {formatLastSync(syncStatus.lastSyncAt)} • {syncStatus.totalEvents} events
-                </p>
+                <div className="flex items-center space-x-4 mt-1">
+                  {accounts.filter(acc => acc.provider === 'google').length > 0 && (
+                    <span className="text-xs text-blue-700">
+                      📅 Google Calendar ({accounts.filter(acc => acc.provider === 'google').length})
+                    </span>
+                  )}
+                  {accounts.filter(acc => acc.provider === 'jira').length > 0 && (
+                    <span className="text-xs text-blue-700">
+                      📋 Jira ({accounts.filter(acc => acc.provider === 'jira').length})
+                    </span>
+                  )}
+                  {accounts.filter(acc => acc.provider === 'github').length > 0 && (
+                    <span className="text-xs text-blue-700">
+                      🐙 GitHub ({accounts.filter(acc => acc.provider === 'github').length})
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -460,35 +612,38 @@ const Calendar = () => {
               <li>• Click and drag to select time slots and create new events</li>
               <li>• Drag events to move them to different times/dates</li>
               <li>• Drag event edges to resize duration</li>
-              <li>• Use <kbd className="px-1 py-0.5 text-xs bg-gray-100 border rounded">Delete</kbd> key to quickly delete selected events</li>
-              <li>• Different event types are color-coded with icons</li>
+              <li>• Use <kbd className="px-1 py-0.5 text-xs bg-gray-100 border rounded">Ctrl+N</kbd> to create new events</li>
+              <li>• Filter events by type using the dropdown above</li>
             </ul>
           </div>
           <div>
             <h4 className="text-xs font-semibold text-gray-700 mb-1">Event Types</h4>
             <ul className="text-sm text-gray-600 space-y-1">
               <li>• 📅 <span className="text-blue-600">Google Calendar</span> events (blue)</li>
-              <li>• 📋 <span className="text-blue-700">Jira Tasks</span> (dark blue)</li>
+              <li>• 📋 <span className="text-green-600">Jira Tasks</span> (green)</li>
               <li>• 🐙 <span className="text-purple-600">GitHub Issues</span> (purple)</li>
-              <li>• Use sync button to fetch latest events from all sources</li>
+              <li>• 📆 <span className="text-gray-600">Manual Events</span> (gray)</li>
+              <li>• Use sync button to fetch latest from connected services</li>
             </ul>
           </div>
         </div>
       </div>
 
       {/* Event Modal */}
-      {selectedEvent && (
-        <EventModal
-          event={selectedEvent}
-          isOpen={isEventModalOpen}
-          onClose={() => {
-            setIsEventModalOpen(false);
-            setSelectedEvent(null);
-          }}
-          onEventUpdated={handleEventUpdated}
-          onEventDeleted={handleEventDeleted}
-        />
-      )}
+      <EventModal
+        event={selectedEvent}
+        isOpen={isEventModalOpen}
+        onClose={() => {
+          setIsEventModalOpen(false);
+          setSelectedEvent(null);
+          setIsCreatingEvent(false);
+          setSelectedDateForCreation(null);
+        }}
+        onEventUpdated={handleEventUpdated}
+        onEventDeleted={handleEventDeleted}
+        isCreating={isCreatingEvent}
+        defaultDate={selectedDateForCreation || (isCreatingEvent ? new Date() : null)}
+      />
     </div>
   );
 };

@@ -121,7 +121,12 @@ const Dashboard = () => {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600">Jira</span>
-              <span className="text-sm text-amber-600 font-medium">🔄 Starting Phase 4</span>
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-green-600 font-medium">✓ Connected</span>
+                <Link to="/accounts" className="text-xs text-blue-600 hover:text-blue-500">
+                  Manage →
+                </Link>
+              </div>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600">GitHub</span>
@@ -251,6 +256,21 @@ const Dashboard = () => {
                 <p className="text-sm text-gray-600">Add or configure integrations</p>
               </div>
             </Link>
+
+            <Link 
+              to="/tasks"
+              className="flex items-center p-3 bg-orange-50 rounded-md hover:bg-orange-100 transition-colors"
+            >
+              <div className="w-8 h-8 bg-orange-500 rounded-md flex items-center justify-center mr-3 flex-shrink-0">
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-gray-900">View Tasks</p>
+                <p className="text-sm text-gray-600">Manage Jira issues & tasks</p>
+              </div>
+            </Link>
           </div>
         </div>
       </div>
@@ -260,7 +280,7 @@ const Dashboard = () => {
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Development Progress</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-green-50 border border-green-200 rounded-md p-4">
-            <h4 className="font-medium text-green-900 mb-2">✅ Completed (Phases 1-3)</h4>
+            <h4 className="font-medium text-green-900 mb-2">✅ Completed (Phases 1-4)</h4>
             <ul className="text-sm text-green-700 space-y-1">
               <li>• Google OAuth Authentication</li>
               <li>• Database Schema & Models</li>
@@ -269,27 +289,31 @@ const Dashboard = () => {
               <li>• Event Sync & Management</li>
               <li>• Multi-Account Support</li>
               <li>• Account Management Dashboard</li>
-            </ul>
-          </div>
-          
-          <div className="bg-amber-50 border border-amber-200 rounded-md p-4">
-            <h4 className="font-medium text-amber-900 mb-2">🔄 Phase 4: Jira Integration</h4>
-            <ul className="text-sm text-amber-700 space-y-1">
-              <li>• Jira OAuth Setup</li>
-              <li>• Issue Fetching Service</li>
-              <li>• Task Display Interface</li>
-              <li>• Issue Status Management</li>
-              <li>• Calendar-Task Sync</li>
+              <li>• Jira OAuth Integration</li>
+              <li>• Task Fetching & Management</li>
+              <li>• Issue Status Updates</li>
             </ul>
           </div>
           
           <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-            <h4 className="font-medium text-blue-900 mb-2">📋 Upcoming Phases</h4>
+            <h4 className="font-medium text-blue-900 mb-2">🔄 Phase 5: Unified Event Creation</h4>
             <ul className="text-sm text-blue-700 space-y-1">
-              <li>• GitHub Integration (Phase 5)</li>
-              <li>• Drag & Drop Interface (Phase 6)</li>
-              <li>• Advanced Filtering (Phase 7)</li>
-              <li>• Mobile Optimization (Phase 8)</li>
+              <li>• Dynamic Event Modal</li>
+              <li>• Multi-Type Event Creation</li>
+              <li>• Database Schema Updates</li>
+              <li>• Calendar Integration Hub</li>
+              <li>• Event Type Detection</li>
+            </ul>
+          </div>
+          
+          <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
+            <h4 className="font-medium text-gray-900 mb-2">📋 Future Phases</h4>
+            <ul className="text-sm text-gray-700 space-y-1">
+              <li>• GitHub Integration (Phase 6)</li>
+              <li>• Drag & Drop Interface (Phase 7)</li>
+              <li>• Advanced Filtering (Phase 8)</li>
+              <li>• Mobile Optimization (Phase 9)</li>
+              <li>• Performance Optimization (Phase 10)</li>
             </ul>
           </div>
         </div>

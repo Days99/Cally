@@ -51,6 +51,120 @@ async function migrate() {
       console.log('ℹ️  Account tracking columns already exist or not needed');
     }
 
+    // STEP 2: Add unified event schema columns
+    console.log('🔧 Adding unified event schema columns...');
+    
+    // Add eventType enum and column
+    try {
+      await sequelize.query(`
+        DO $$ BEGIN
+          CREATE TYPE calendar_event_type AS ENUM ('google_calendar', 'jira_task', 'github_issue', 'manual', 'outlook', 'teams');
+        EXCEPTION
+          WHEN duplicate_object THEN null;
+        END $$;
+      `);
+      
+      await sequelize.query(`
+        ALTER TABLE calendar_events 
+        ADD COLUMN IF NOT EXISTS "eventType" calendar_event_type DEFAULT 'manual';
+      `);
+      console.log('✅ eventType column added to calendar_events table');
+    } catch (error) {
+      console.log('ℹ️  eventType column already exists or not needed');
+    }
+
+    // Update status enum to include task statuses
+    try {
+      await sequelize.query(`
+        DO $$ BEGIN
+          CREATE TYPE calendar_event_status_new AS ENUM ('confirmed', 'tentative', 'cancelled', 'completed', 'in_progress', 'todo', 'done');
+        EXCEPTION
+          WHEN duplicate_object THEN null;
+        END $$;
+      `);
+      
+      await sequelize.query(`
+        ALTER TABLE calendar_events 
+        ADD COLUMN IF NOT EXISTS "status_new" calendar_event_status_new DEFAULT 'confirmed';
+      `);
+      
+      await sequelize.query(`
+        UPDATE calendar_events 
+        SET "status_new" = CASE 
+          WHEN status = 'confirmed' THEN 'confirmed'::calendar_event_status_new
+          WHEN status = 'tentative' THEN 'tentative'::calendar_event_status_new  
+          WHEN status = 'cancelled' THEN 'cancelled'::calendar_event_status_new
+          ELSE 'confirmed'::calendar_event_status_new
+        END;
+      `);
+      
+      await sequelize.query(`
+        ALTER TABLE calendar_events DROP COLUMN IF EXISTS status;
+      `);
+      
+      await sequelize.query(`
+        ALTER TABLE calendar_events RENAME COLUMN "status_new" TO status;
+      `);
+      
+      console.log('✅ Updated status enum with task statuses');
+    } catch (error) {
+      console.log('ℹ️  Status enum update not needed or already done');
+    }
+
+    // Add priority column
+    try {
+      await sequelize.query(`
+        DO $$ BEGIN
+          CREATE TYPE calendar_event_priority AS ENUM ('highest', 'high', 'medium', 'low', 'lowest');
+        EXCEPTION
+          WHEN duplicate_object THEN null;
+        END $$;
+      `);
+      
+      await sequelize.query(`
+        ALTER TABLE calendar_events 
+        ADD COLUMN IF NOT EXISTS "priority" calendar_event_priority;
+      `);
+      console.log('✅ priority column added to calendar_events table');
+    } catch (error) {
+      console.log('ℹ️  priority column already exists or not needed');
+    }
+
+    // Add metadata, color, and syncStatus columns
+    try {
+      await sequelize.query(`
+        ALTER TABLE calendar_events 
+        ADD COLUMN IF NOT EXISTS "metadata" JSONB,
+        ADD COLUMN IF NOT EXISTS "color" VARCHAR(7),
+        ADD COLUMN IF NOT EXISTS "syncStatus" VARCHAR(20) DEFAULT 'manual';
+      `);
+      console.log('✅ metadata, color, and syncStatus columns added');
+    } catch (error) {
+      console.log('ℹ️  metadata/color/syncStatus columns already exist or not needed');
+    }
+
+    // Update externalId and calendarId to allow NULL for manual events
+    try {
+      await sequelize.query(`
+        ALTER TABLE calendar_events 
+        ALTER COLUMN "externalId" DROP NOT NULL,
+        ALTER COLUMN "calendarId" DROP NOT NULL;
+      `);
+      console.log('✅ Made externalId and calendarId nullable for manual events');
+    } catch (error) {
+      console.log('ℹ️  externalId/calendarId nullable update not needed');
+    }
+
+    // Remove unique constraint on externalId+calendarId to allow duplicates from different types
+    try {
+      await sequelize.query(`
+        DROP INDEX IF EXISTS calendar_events_external_id_calendar_id;
+      `);
+      console.log('✅ Removed unique constraint on externalId+calendarId');
+    } catch (error) {
+      console.log('ℹ️  Unique constraint already removed or not needed');
+    }
+
     // Remove unique constraint on provider to allow multiple accounts
     try {
       await sequelize.query(`
@@ -73,7 +187,19 @@ async function migrate() {
       console.log('ℹ️  Primary account setup not needed');
     }
 
-    // STEP 2: Now sync all models (create tables and indexes)
+    // Set existing events as google_calendar type if they have google data
+    try {
+      await sequelize.query(`
+        UPDATE calendar_events 
+        SET "eventType" = 'google_calendar'
+        WHERE "externalId" IS NOT NULL AND "calendarId" IS NOT NULL;
+      `);
+      console.log('✅ Updated existing events to google_calendar type');
+    } catch (error) {
+      console.log('ℹ️  Event type update not needed');
+    }
+
+    // STEP 3: Now sync all models (create tables and indexes)
     console.log('🔄 Syncing database models...');
     await sequelize.sync({ force: false });
     console.log('✅ Database tables and indexes created successfully.');
@@ -81,12 +207,12 @@ async function migrate() {
     console.log('📊 Database structure:');
     console.log('  - users');
     console.log('  - tokens (with multi-account support)');
-    console.log('  - calendar_events (with account tracking)');
+    console.log('  - calendar_events (with unified event schema)');
     console.log('  - tasks');
     console.log('  - task_assignments');
     
     console.log('🎉 Migration completed successfully!');
-    console.log('🔗 Multi-account integration is now ready!');
+    console.log('🔗 Unified event creation system is now ready!');
     process.exit(0);
   } catch (error) {
     console.error('❌ Migration failed:', error);
