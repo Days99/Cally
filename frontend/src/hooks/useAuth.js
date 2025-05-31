@@ -22,18 +22,13 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuthStatus = async () => {
     try {
-      console.log('useAuth: Starting auth status check');
       setLoading(true);
       
       if (authService.isAuthenticated()) {
-        console.log('useAuth: Service says authenticated, getting profile');
         const profile = await authService.getProfile();
-        console.log('useAuth: Profile received:', profile);
         setUser(profile);
         setAuthenticated(true);
-        console.log('useAuth: Authentication state set to true');
       } else {
-        console.log('useAuth: Service says not authenticated');
         setUser(null);
         setAuthenticated(false);
       }
@@ -45,7 +40,6 @@ export const AuthProvider = ({ children }) => {
       authService.logout();
     } finally {
       setLoading(false);
-      console.log('useAuth: Auth check completed');
     }
   };
 

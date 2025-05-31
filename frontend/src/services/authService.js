@@ -60,12 +60,10 @@ class AuthService {
 
   // Handle OAuth callback tokens
   setTokens(accessToken, refreshToken) {
-    console.log('authService: Setting tokens');
     this.token = accessToken;
     this.refreshToken = refreshToken;
     localStorage.setItem('accessToken', accessToken);
     localStorage.setItem('refreshToken', refreshToken);
-    console.log('authService: Tokens stored in localStorage');
   }
 
   // Refresh access token
@@ -87,12 +85,9 @@ class AuthService {
   // Get current user profile
   async getProfile() {
     try {
-      console.log('authService: Getting profile, token exists:', !!this.token);
       const response = await axios.get(`${API_URL}/api/auth/me`);
-      console.log('authService: Profile response:', response.data);
       return response.data.user;
     } catch (error) {
-      console.error('authService: Profile request failed:', error.response?.data || error.message);
       throw new Error(error.response?.data?.message || 'Failed to get profile');
     }
   }
@@ -145,14 +140,7 @@ class AuthService {
 
   // Check if user is authenticated
   isAuthenticated() {
-    const hasToken = !!this.token;
-    const tokenInStorage = localStorage.getItem('accessToken');
-    console.log('authService: isAuthenticated check:', {
-      hasToken,
-      tokenInStorage: !!tokenInStorage,
-      tokensMatch: this.token === tokenInStorage
-    });
-    return hasToken;
+    return !!this.token;
   }
 
   // Get stored token

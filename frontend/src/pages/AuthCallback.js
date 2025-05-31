@@ -10,54 +10,38 @@ const AuthCallback = () => {
   const [status, setStatus] = useState('processing');
   const [error, setError] = useState(null);
 
-  console.log('AuthCallback: Component mounted/rendered');
-
   useEffect(() => {
     handleCallback();
   }, []);
 
   const handleCallback = async () => {
     try {
-      console.log('AuthCallback: Starting callback handling');
-      
       const token = searchParams.get('token');
       const refreshToken = searchParams.get('refresh');
       const errorMessage = searchParams.get('message');
 
-      console.log('AuthCallback: URL params:', { 
-        hasToken: !!token, 
-        hasRefreshToken: !!refreshToken, 
-        errorMessage 
-      });
-
       if (errorMessage) {
-        console.error('AuthCallback: Error from backend:', errorMessage);
         setError(decodeURIComponent(errorMessage));
         setStatus('error');
         return;
       }
 
       if (!token || !refreshToken) {
-        console.error('AuthCallback: Missing tokens');
         setError('Missing authentication tokens');
         setStatus('error');
         return;
       }
 
-      console.log('AuthCallback: Storing tokens');
       // Store tokens
       authService.setTokens(token, refreshToken);
       
-      console.log('AuthCallback: Checking auth status');
       // Update auth context
       await checkAuthStatus();
       
-      console.log('AuthCallback: Auth status updated, setting success');
       setStatus('success');
       
       // Redirect to dashboard after a short delay
       setTimeout(() => {
-        console.log('AuthCallback: Redirecting to dashboard');
         navigate('/', { replace: true });
       }, 2000);
 
