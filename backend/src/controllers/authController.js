@@ -24,7 +24,7 @@ class AuthController {
   // Handle Google OAuth callback
   async googleCallback(req, res) {
     try {
-      const { code } = req.query;
+      const { code, state } = req.query;
 
       if (!code) {
         return res.status(400).json({ 
@@ -33,14 +33,28 @@ class AuthController {
         });
       }
 
+      // Parse state parameter for additional account info
+      let stateData = {};
+      if (state) {
+        try {
+          stateData = JSON.parse(state);
+        } catch (e) {
+          console.log('Invalid state parameter:', state);
+        }
+      }
+
       // Exchange code for tokens
       const tokens = await googleAuthService.getTokens(code);
       
       // Get user info from Google
       const userInfo = await googleAuthService.getUserInfo(tokens.access_token);
       
-      // Create or update user
-      const user = await googleAuthService.createOrUpdateUser(userInfo, tokens);
+      // Create or update user - handle additional accounts
+      const user = await googleAuthService.createOrUpdateUser(userInfo, tokens, {
+        isAdditionalAccount: stateData.isAdditionalAccount || false,
+        accountName: stateData.accountName,
+        userId: stateData.userId
+      });
       
       // Generate JWT tokens
       const accessToken = generateToken(user.id);

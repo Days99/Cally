@@ -13,6 +13,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+
 const AccountManager = () => {
   const [accounts, setAccounts] = useState({});
   const [stats, setStats] = useState({});
@@ -28,9 +30,9 @@ const AccountManager = () => {
   const fetchAccounts = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/accounts', {
+      const response = await fetch(`${API_URL}/api/accounts`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
         }
       });
       
@@ -47,9 +49,9 @@ const AccountManager = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch('/api/accounts/stats', {
+      const response = await fetch(`${API_URL}/api/accounts/stats`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
         }
       });
       
@@ -67,11 +69,11 @@ const AccountManager = () => {
       try {
         setAddingAccount(provider);
         
-        const response = await fetch('/api/accounts/google/add', {
+        const response = await fetch(`${API_URL}/api/accounts/google/add`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
           },
           body: JSON.stringify({
             accountName: newAccountName || `${provider} Account`
@@ -80,7 +82,11 @@ const AccountManager = () => {
 
         if (response.ok) {
           const data = await response.json();
-          // Redirect to Google OAuth
+          
+          // Store current location for redirect after OAuth
+          localStorage.setItem('oauth_return_url', window.location.pathname);
+          
+          // Redirect to Google OAuth - this will redirect to root domain automatically
           window.location.href = data.authUrl;
         } else {
           throw new Error('Failed to initiate account addition');
@@ -98,10 +104,10 @@ const AccountManager = () => {
     }
 
     try {
-      const response = await fetch(`/api/accounts/${accountId}`, {
+      const response = await fetch(`${API_URL}/api/accounts/${accountId}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
         }
       });
 
@@ -118,10 +124,10 @@ const AccountManager = () => {
 
   const handleSetPrimary = async (accountId) => {
     try {
-      const response = await fetch(`/api/accounts/${accountId}/primary`, {
+      const response = await fetch(`${API_URL}/api/accounts/${accountId}/primary`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
         }
       });
 
@@ -137,11 +143,11 @@ const AccountManager = () => {
 
   const handleUpdateName = async (accountId, newName) => {
     try {
-      const response = await fetch(`/api/accounts/${accountId}/name`, {
+      const response = await fetch(`${API_URL}/api/accounts/${accountId}/name`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
         },
         body: JSON.stringify({ name: newName })
       });

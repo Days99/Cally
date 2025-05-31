@@ -40,9 +40,17 @@ const AuthCallback = () => {
       
       setStatus('success');
       
-      // Redirect to dashboard after a short delay
+      // Check if user should return to account management page
+      const returnUrl = localStorage.getItem('oauth_return_url');
+      localStorage.removeItem('oauth_return_url');
+      
+      // Redirect to the appropriate page after a short delay
       setTimeout(() => {
-        navigate('/', { replace: true });
+        if (returnUrl && returnUrl.includes('/account')) {
+          navigate('/account', { replace: true });
+        } else {
+          navigate('/', { replace: true });
+        }
       }, 2000);
 
     } catch (error) {

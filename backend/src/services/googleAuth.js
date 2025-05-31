@@ -12,7 +12,7 @@ class GoogleAuthService {
 
   // Generate Google OAuth URL with multi-account support
   getAuthUrl(options = {}) {
-    const { isAdditionalAccount = false, accountName = null } = options;
+    const { isAdditionalAccount = false, accountName = null, userId = null } = options;
     
     const scopes = [
       'https://www.googleapis.com/auth/userinfo.profile',
@@ -27,7 +27,8 @@ class GoogleAuthService {
       prompt: 'consent',
       state: JSON.stringify({
         isAdditionalAccount,
-        accountName
+        accountName,
+        userId
       })
     });
 

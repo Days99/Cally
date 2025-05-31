@@ -62,21 +62,21 @@ cally/
 ### Phase 1: Project Setup ✅
 - [x] Repository structure
 - [x] Basic documentation
-- [ ] Frontend React app initialization
-- [ ] Backend Express server setup
-- [ ] Database schema design
+- [x] Frontend React app initialization
+- [x] Backend Express server setup
+- [x] Database schema design
 
 ### Phase 2: Authentication & Authorization
-- [ ] Google OAuth 2.0 implementation
+- [x] Google OAuth 2.0 implementation
 - [ ] JWT token management
-- [ ] Protected API routes
+- [x] Protected API routes
 - [ ] User session handling
 
 ### Phase 3: Google Calendar Integration
-- [ ] Google Calendar API setup
-- [ ] Calendar event fetching
-- [ ] FullCalendar.js implementation
-- [ ] Calendar view UI
+- [x] Google Calendar API setup
+- [x] Calendar event fetching
+- [x] FullCalendar.js implementation
+- [x] Calendar view UI
 
 ### Phase 4: Jira Integration
 - [ ] Atlassian REST API integration
@@ -182,7 +182,7 @@ GITHUB_CLIENT_SECRET=your-github-client-secret
 
 ### Frontend (.env)
 ```
-REACT_APP_API_URL=http://localhost:3001
+REACT_APP_API_URL=http://localhost:3000
 REACT_APP_GOOGLE_CLIENT_ID=your-google-client-id
 ```
 
