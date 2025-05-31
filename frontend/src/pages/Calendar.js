@@ -41,50 +41,65 @@ const Calendar = () => {
       const calendarApi = calendarRef.current?.getApi();
       const currentView = calendarApi?.view;
       
-      // Get date range for current calendar view
-      const dateRange = currentView ? {
-        startDate: currentView.activeStart.toISOString().split('T')[0],
-        endDate: currentView.activeEnd.toISOString().split('T')[0]
-      } : eventService.getDateRange(view);
+      // Get date range for current calendar view with proper buffer
+      let dateRange;
+      if (currentView) {
+        // For calendar views, use a wider range to ensure we capture all relevant events
+        const viewStart = new Date(currentView.activeStart);
+        const viewEnd = new Date(currentView.activeEnd);
+        
+        // Add buffer for better event loading
+        viewStart.setDate(viewStart.getDate() - 7); // 1 week before
+        viewEnd.setDate(viewEnd.getDate() + 7);     // 1 week after
+        
+        dateRange = {
+          startDate: viewStart.toISOString().split('T')[0],
+          endDate: viewEnd.toISOString().split('T')[0]
+        };
+        
+        console.log('🔍 DEBUG: Calendar view detected:', currentView.type);
+        console.log('🔍 DEBUG: View active range:', currentView.activeStart, 'to', currentView.activeEnd);
+        console.log('🔍 DEBUG: Expanded date range for loading:', dateRange);
+      } else {
+        // Fallback to service date range
+        dateRange = eventService.getDateRange(view);
+        console.log('🔍 DEBUG: Using fallback date range:', dateRange);
+      }
 
-      console.log('🔍 DEBUG: loadEvents called - Current events count:', events.length);
-      console.log('Loading events with date range:', dateRange, 'Filter:', eventFilter);
+      console.log('🔍 DEBUG: loadEvents called - Filter:', eventFilter, 'Range:', dateRange);
 
       const options = {
         ...dateRange,
-        eventType: eventFilter
+        eventType: eventFilter !== 'all' ? eventFilter : undefined
       };
 
       // Load unified events
       const eventsData = await eventService.getEvents(options);
-      console.log('🔍 DEBUG: Raw events data from API:', eventsData);
-      console.log('🔍 DEBUG: Raw events count:', eventsData?.length || 0);
-      
       const formattedEvents = eventService.formatEventsForCalendar(eventsData);
-      console.log('🔍 DEBUG: Formatted events for calendar:', formattedEvents);
-      console.log('🔍 DEBUG: Formatted events count:', formattedEvents?.length || 0);
+      
+      console.log('🔍 DEBUG: Loaded', eventsData?.length || 0, 'events, formatted to', formattedEvents?.length || 0);
       
       // Clear existing events before setting new ones
       setEvents([]);
-      console.log('🔍 DEBUG: Cleared existing events');
       
       // Set new events
       setEvents(formattedEvents);
-      console.log('🔍 DEBUG: Set new events, final count:', formattedEvents?.length || 0);
       
     } catch (error) {
       console.error('Error loading events:', error);
       setError(error.message);
     }
-  }, [eventFilter, view, events.length]);
+  }, [eventFilter, view]);
 
   const loadInitialData = useCallback(async () => {
-    if (initialDataLoaded) return;
+    if (initialDataLoaded) {
+      console.log('🔍 DEBUG: loadInitialData skipped - already loaded');
+      return;
+    }
     
     try {
       setLoading(true);
       setError(null);
-      setInitialDataLoaded(true);
 
       console.log('🔍 DEBUG: Starting loadInitialData...');
 
@@ -118,11 +133,24 @@ const Calendar = () => {
       
       setAccounts(finalAccounts);
       setEventStats(statsData);
+      
+      // Mark as loaded BEFORE calling loadEvents to prevent loops
+      setInitialDataLoaded(true);
 
       console.log('🔍 DEBUG: State updated, about to load events...');
       
-      // Load events for the current view
-      await loadEvents();
+      // Load events for the current view (call directly, not via callback)
+      try {
+        const options = {
+          eventType: eventFilter !== 'all' ? eventFilter : undefined
+        };
+        const eventsData = await eventService.getEvents(options);
+        const formattedEvents = eventService.formatEventsForCalendar(eventsData);
+        setEvents(formattedEvents);
+        console.log('🔍 DEBUG: Initial events loaded:', formattedEvents?.length || 0);
+      } catch (eventError) {
+        console.error('🔍 DEBUG: Failed to load initial events:', eventError);
+      }
       
       console.log('🔍 DEBUG: loadInitialData completed successfully');
     } catch (error) {
@@ -131,7 +159,7 @@ const Calendar = () => {
     } finally {
       setLoading(false);
     }
-  }, [initialDataLoaded, loadEvents]);
+  }, [initialDataLoaded, eventFilter]);
 
   useEffect(() => {
     loadInitialData();
@@ -146,9 +174,7 @@ const Calendar = () => {
 
   // DEBUG: Monitor accounts state changes
   useEffect(() => {
-    console.log('🔍 DEBUG: Accounts state changed:', accounts);
-    console.log('🔍 DEBUG: Accounts length:', accounts?.length);
-    console.log('🔍 DEBUG: Is accounts array?', Array.isArray(accounts));
+    console.log('🔍 DEBUG: Accounts state changed - Length:', accounts?.length, 'Is Array:', Array.isArray(accounts));
   }, [accounts]);
 
   const handleSync = async () => {
@@ -434,7 +460,7 @@ const Calendar = () => {
   return (
     <div className="space-y-6">
       {/* Custom CSS for event types */}
-      <style jsx>{`
+      <style>{`
         .event-google_calendar {
           border-left: 4px solid #4285f4 !important;
         }

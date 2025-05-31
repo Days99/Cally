@@ -122,7 +122,7 @@ class EventController {
           });
         }
 
-        // Create event in Google Calendar
+        // Create event in Google Calendar (this will also save to our database via saveEventToDatabase)
         const googleEvent = await googleCalendar.createEvent(userId, calendarId || 'primary', {
           title,
           description,
@@ -133,11 +133,29 @@ class EventController {
           attendees: metadata.attendees || []
         });
 
-        eventData.externalId = googleEvent.id;
-        eventData.calendarId = calendarId || 'primary';
-        eventData.tokenId = accountId;
-        eventData.syncStatus = 'synced';
-        eventData.htmlLink = googleEvent.htmlLink;
+        // Find the event that was created in our database by saveEventToDatabase
+        const event = await CalendarEvent.findOne({
+          where: {
+            userId,
+            externalId: googleEvent.id,
+            eventType: 'google_calendar'
+          },
+          include: [{
+            model: Token,
+            as: 'token',
+            attributes: ['accountName', 'accountEmail', 'provider', 'isPrimary']
+          }]
+        });
+
+        if (!event) {
+          throw new Error('Event was created in Google Calendar but not found in database');
+        }
+
+        return res.status(201).json({
+          success: true,
+          event: event,
+          message: 'Google Calendar event created successfully'
+        });
         
       } else if (eventType === 'jira_task') {
         // Create Jira issue
@@ -172,7 +190,7 @@ class EventController {
         };
       }
 
-      // Store in our database
+      // Store in our database (only for non-Google Calendar events)
       const event = await CalendarEvent.create(eventData);
 
       // Fetch with token info for response
