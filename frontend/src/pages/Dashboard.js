@@ -2,12 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import calendarService from '../services/calendarService';
+import eventService from '../services/eventService';
 
 const Dashboard = () => {
   const { user } = useAuth();
   const [syncStatus, setSyncStatus] = useState(null);
   const [recentEvents, setRecentEvents] = useState([]);
+  const [eventStats, setEventStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     loadDashboardData();
@@ -17,21 +20,49 @@ const Dashboard = () => {
     try {
       setLoading(true);
       
-      // Load sync status and recent events
-      const [statusData, eventsData] = await Promise.all([
+      // Load sync status, recent events, and event statistics
+      const [statusData, eventsData, statsData] = await Promise.all([
         calendarService.getSyncStatus(),
         calendarService.getEvents('primary', { 
           timeMin: new Date().toISOString(),
           maxResults: 5 
-        })
+        }),
+        eventService.getEventStats()
       ]);
 
       setSyncStatus(statusData);
       setRecentEvents(eventsData.events || []);
+      setEventStats(statsData);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUnifiedSync = async () => {
+    try {
+      setSyncing(true);
+      console.log('🔄 Starting unified sync from Dashboard...');
+      
+      // Use unified sync that handles both Google Calendar and Jira
+      const syncResult = await calendarService.syncAllSources({
+        timeMin: new Date().toISOString(),
+        timeMax: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
+        maxResults: 250
+      });
+      
+      console.log('📊 Dashboard sync results:', syncResult);
+      
+      // Reload dashboard data
+      await loadDashboardData();
+      
+      console.log('🎉 Dashboard unified sync completed successfully');
+      
+    } catch (error) {
+      console.error('❌ Error during dashboard sync:', error);
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -96,41 +127,77 @@ const Dashboard = () => {
         {/* Tasks (Placeholder) */}
         <div className="card">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Tasks</h3>
-            <div className="w-3 h-3 bg-gray-300 rounded-full"></div>
+            <h3 className="text-lg font-semibold text-gray-900">Jira Tasks</h3>
+            <div className={`w-3 h-3 rounded-full ${eventStats?.byType?.jira_task > 0 ? 'bg-green-400' : 'bg-gray-300'}`}></div>
           </div>
-          <div>
-            <p className="text-2xl font-bold text-gray-900">Coming Soon</p>
-            <p className="text-gray-600">Jira & GitHub</p>
-            <p className="text-sm text-gray-500 mt-2">Phase 4 & 5</p>
-          </div>
+          {loading ? (
+            <div className="animate-pulse">
+              <div className="h-4 bg-gray-200 rounded mb-2"></div>
+              <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+            </div>
+          ) : (
+            <div>
+              <p className="text-2xl font-bold text-gray-900">
+                {eventStats?.byType?.jira_task || 0}
+              </p>
+              <p className="text-gray-600">active tasks</p>
+              <p className="text-sm text-gray-500 mt-2">
+                Connected to Jira workspace
+              </p>
+            </div>
+          )}
         </div>
 
-        {/* Integrations */}
+        {/* Manual Events */}
         <div className="card">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Integrations</h3>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Google Calendar</span>
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-green-600 font-medium">✓ Multi-Account</span>
-                <Link to="/accounts" className="text-xs text-blue-600 hover:text-blue-500">
-                  Manage →
-                </Link>
-              </div>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Manual Events</h3>
+            <div className={`w-3 h-3 rounded-full ${eventStats?.byType?.manual > 0 ? 'bg-blue-400' : 'bg-gray-300'}`}></div>
+          </div>
+          {loading ? (
+            <div className="animate-pulse">
+              <div className="h-4 bg-gray-200 rounded mb-2"></div>
+              <div className="h-4 bg-gray-200 rounded w-3/4"></div>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Jira</span>
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-green-600 font-medium">✓ Connected</span>
-                <Link to="/accounts" className="text-xs text-blue-600 hover:text-blue-500">
-                  Manage →
-                </Link>
-              </div>
+          ) : (
+            <div>
+              <p className="text-2xl font-bold text-gray-900">
+                {eventStats?.byType?.manual || 0}
+              </p>
+              <p className="text-gray-600">custom events</p>
+              <p className="text-sm text-gray-500 mt-2">
+                Created manually
+              </p>
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* Integration Status */}
+      <div className="card">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">📊 Integration Status</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">GitHub</span>
-              <span className="text-sm text-gray-400">Phase 5</span>
+              <div>
+                <h4 className="font-medium text-blue-900">Google Calendar</h4>
+                <p className="text-sm text-blue-700">
+                  Phase 1-3: ✓ Connected & Active
+                </p>
+              </div>
+              <div className="text-blue-600 text-2xl">📅</div>
+            </div>
+          </div>
+          
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-medium text-green-900">Jira Integration</h4>
+                <p className="text-sm text-green-700">
+                  Phase 4: ✓ Connected & Active
+                </p>
+              </div>
+              <div className="text-green-600 text-2xl">📋</div>
             </div>
           </div>
         </div>
@@ -212,17 +279,30 @@ const Dashboard = () => {
             </Link>
 
             <button 
-              onClick={loadDashboardData}
-              className="w-full flex items-center p-3 bg-green-50 rounded-md hover:bg-green-100 transition-colors text-left"
+              onClick={handleUnifiedSync}
+              disabled={syncing}
+              className={`w-full flex items-center p-3 rounded-md transition-colors text-left ${
+                syncing 
+                  ? 'bg-green-100 cursor-not-allowed' 
+                  : 'bg-green-50 hover:bg-green-100'
+              }`}
             >
               <div className="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center mr-3 flex-shrink-0">
-                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
+                {syncing ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                ) : (
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900">Sync Calendar</p>
-                <p className="text-sm text-gray-600">Refresh events from Google</p>
+                <p className="font-medium text-gray-900">
+                  {syncing ? 'Syncing...' : 'Sync All Sources'}
+                </p>
+                <p className="text-sm text-gray-600">
+                  {syncing ? 'Updating calendar and tasks...' : 'Refresh Google Calendar & Jira tasks'}
+                </p>
               </div>
             </button>
 

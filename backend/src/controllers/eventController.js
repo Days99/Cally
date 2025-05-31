@@ -256,6 +256,22 @@ class EventController {
             event.tokenId
           );
         }
+        
+        // Check if the Jira task is being marked as completed
+        if (updateData.status === 'done' || updateData.status === 'completed' || 
+            (updateData.metadata && updateData.metadata.statusCategory === 'Done')) {
+          
+          console.log(`Jira task ${event.externalId} marked as completed, deleting calendar event`);
+          
+          // Delete the calendar event since the Jira task is done
+          await event.destroy();
+          
+          return res.json({
+            success: true,
+            deleted: true,
+            message: 'Event deleted because Jira task was completed'
+          });
+        }
       }
 
       // Update in our database

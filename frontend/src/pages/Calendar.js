@@ -179,26 +179,32 @@ const Calendar = () => {
 
   const handleSync = async () => {
     try {
-      console.log('🔍 DEBUG: Sync button clicked!');
-      console.log('🔍 DEBUG: Current accounts:', accounts);
-      console.log('🔍 DEBUG: Accounts is array:', Array.isArray(accounts));
-      console.log('🔍 DEBUG: Google accounts:', Array.isArray(accounts) ? accounts.filter(acc => acc.provider === 'google') : 'accounts not array');
-      console.log('🔍 DEBUG: Syncing state:', syncing);
+      console.log('🔄 Starting unified sync (Google Calendar + Jira Tasks)...');
       
       setSyncing(true);
       setError(null);
 
-      console.log('🔄 Starting bidirectional sync with Google Calendar...');
-
-      // Step 1: Sync FROM Google Calendar TO local database
-      await syncGoogleCalendarAccounts();
-      console.log('✅ Google Calendar → Local Database sync completed');
+      const calendarApi = calendarRef.current?.getApi();
+      const currentView = calendarApi?.view;
       
-      // Step 2: Reload events from unified database (which now includes updated Google events)
+      // Get current calendar view date range for focused sync
+      const dateRange = currentView ? {
+        timeMin: currentView.activeStart.toISOString(),
+        timeMax: currentView.activeEnd.toISOString()
+      } : calendarService.getDateRange(view);
+
+      console.log(`📊 Sync date range: ${dateRange.timeMin} to ${dateRange.timeMax}`);
+
+      // Call unified sync endpoint that handles both Google Calendar and Jira
+      const syncResult = await calendarService.syncAllSources(dateRange);
+      
+      console.log('📊 Sync results:', syncResult);
+      
+      // Reload events from unified database
       await loadEvents();
       console.log('✅ Local unified events reloaded');
       
-      // Step 3: Update stats to reflect new event counts
+      // Update stats to reflect new event counts
       try {
         const newStats = await eventService.getEventStats();
         setEventStats(newStats);
@@ -208,7 +214,8 @@ const Calendar = () => {
         // Don't fail the whole sync if stats fail
       }
       
-      console.log('🎉 Bidirectional sync completed successfully');
+      console.log('🎉 Unified sync completed successfully');
+      console.log(`✅ Total: ${syncResult.syncResults?.total?.synced || 0} synced, ${syncResult.syncResults?.total?.deleted || 0} deleted`);
       
       // Show success notification briefly
       setSyncSuccess(true);
@@ -217,62 +224,12 @@ const Calendar = () => {
       }, 3000);
       
     } catch (error) {
-      console.error('❌ Error during bidirectional sync:', error);
+      console.error('❌ Error during unified sync:', error);
       setError(`Sync failed: ${error.message}`);
     } finally {
       setSyncing(false);
     }
   };
-
-  const syncGoogleCalendarAccounts = useCallback(async () => {
-    try {
-      console.log('🔍 DEBUG: syncGoogleCalendarAccounts called');
-      console.log('🔍 DEBUG: Current accounts for sync:', accounts);
-      
-      const googleAccounts = Array.isArray(accounts) ? accounts.filter(acc => acc.provider === 'google') : [];
-      console.log('🔍 DEBUG: Filtered Google accounts:', googleAccounts);
-      
-      if (googleAccounts.length === 0) {
-        console.log('🔍 DEBUG: No Google Calendar accounts to sync - this is OK, sync will continue');
-        return;
-      }
-
-      console.log(`📅 Syncing ${googleAccounts.length} Google Calendar account(s)...`);
-      
-      // Sync each Google account
-      for (const account of googleAccounts) {
-        try {
-          console.log(`🔄 Syncing account: ${account.accountEmail || account.name}`);
-          
-          const calendarApi = calendarRef.current?.getApi();
-          const currentView = calendarApi?.view;
-          
-          // Get current calendar view date range for focused sync
-          const dateRange = currentView ? {
-            timeMin: currentView.activeStart.toISOString(),
-            timeMax: currentView.activeEnd.toISOString()
-          } : calendarService.getDateRange(view);
-
-          console.log(`📊 Sync date range: ${dateRange.timeMin} to ${dateRange.timeMax}`);
-
-          // Call backend sync endpoint - this fetches from Google and updates local DB
-          const syncResult = await calendarService.syncEvents('primary', dateRange);
-          
-          console.log(`✅ Synced ${syncResult.count || 0} events for account: ${account.accountEmail || account.name}`);
-          
-        } catch (error) {
-          console.error(`❌ Error syncing account ${account.accountEmail || account.name}:`, error);
-          // Continue with other accounts even if one fails
-        }
-      }
-      
-      console.log('✅ All Google Calendar accounts sync completed');
-      
-    } catch (error) {
-      console.error('❌ Error during Google Calendar sync:', error);
-      throw error;
-    }
-  }, [accounts, view]);
 
   const handleDateChange = (info) => {
     // Reload events when calendar view changes
@@ -664,7 +621,7 @@ const Calendar = () => {
             </div>
             <div className="ml-3">
               <p className="text-sm text-green-800">
-                🎉 Calendar sync completed successfully! Your calendar is now up to date with Google Calendar.
+                🎉 Unified sync completed successfully! Your calendar is now up to date with Google Calendar and Jira tasks.
               </p>
             </div>
             <div className="ml-auto pl-3">

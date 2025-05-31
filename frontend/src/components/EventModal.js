@@ -35,6 +35,8 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
   const [error, setError] = useState(null);
   const [accounts, setAccounts] = useState([]);
   const [accountsLoaded, setAccountsLoaded] = useState(false);
+  const [jiraIssues, setJiraIssues] = useState([]);
+  const [loadingJiraIssues, setLoadingJiraIssues] = useState(false);
 
   // Event type configurations
   const eventTypes = {
@@ -96,12 +98,36 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
       console.log('Loaded accounts:', accountsData);
       setAccounts(Array.isArray(accountsData) ? accountsData : []);
     } catch (error) {
-      console.error('Error loading accounts:', error);
+      console.error('Failed to load accounts:', error);
       setError(`Failed to load accounts: ${error.message}`);
       setAccounts([]); // Ensure accounts is always an array
       setAccountsLoaded(false); // Reset on error so it can retry later
     }
   }, [isOpen, accountsLoaded]);
+
+  // Load Jira issues when linking existing issue
+  const loadJiraIssues = useCallback(async () => {
+    if (formData.eventType !== 'jira_task' || 
+        formData.jiraAssociationType !== 'existing' || 
+        !formData.accountId) {
+      setJiraIssues([]);
+      return;
+    }
+
+    try {
+      setLoadingJiraIssues(true);
+      console.log('Loading Jira issues for account:', formData.accountId);
+      const issues = await accountService.getJiraIssues(formData.accountId);
+      console.log('Loaded Jira issues:', issues);
+      setJiraIssues(Array.isArray(issues) ? issues : []);
+    } catch (error) {
+      console.error('Failed to load Jira issues:', error);
+      setError(`Failed to load Jira issues: ${error.message}`);
+      setJiraIssues([]);
+    } finally {
+      setLoadingJiraIssues(false);
+    }
+  }, [formData.eventType, formData.jiraAssociationType, formData.accountId]);
 
   useEffect(() => {
     if (isOpen) {
@@ -178,6 +204,14 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
       setError(null);
     }
   }, [event, isOpen, isCreating, defaultDate, getEventType, loadAccounts]);
+
+  useEffect(() => {
+    loadAccounts();
+  }, [loadAccounts]);
+
+  useEffect(() => {
+    loadJiraIssues();
+  }, [loadJiraIssues]);
 
   const formatDateTimeForInput = (date) => {
     if (!date) {
@@ -658,19 +692,60 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                     <div className="space-y-3">
                       <div>
                         <label className="block text-xs font-medium text-green-700 mb-1">
-                          Issue Key *
+                          Select Issue *
                         </label>
-                        <input
-                          type="text"
-                          name="existingJiraKey"
-                          value={formData.existingJiraKey || ''}
-                          onChange={handleInputChange}
-                          placeholder="e.g., PROJ-123"
-                          className="w-full px-2 py-1 text-sm border border-green-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
-                        />
-                        <p className="text-xs text-green-600 mt-1">
-                          Enter the exact Jira issue key (e.g., PROJ-123)
-                        </p>
+                        {loadingJiraIssues ? (
+                          <div className="w-full px-2 py-1 text-sm border border-green-300 rounded bg-green-50 text-green-600 flex items-center">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600 mr-2"></div>
+                            Loading available issues...
+                          </div>
+                        ) : jiraIssues.length > 0 ? (
+                          <select
+                            name="existingJiraKey"
+                            value={formData.existingJiraKey || ''}
+                            onChange={handleInputChange}
+                            className="w-full px-2 py-1 text-sm border border-green-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                          >
+                            <option value="">Select an issue...</option>
+                            {jiraIssues.map(issue => (
+                              <option key={issue.key} value={issue.key}>
+                                {issue.key} - {issue.summary} ({issue.status})
+                              </option>
+                            ))}
+                          </select>
+                        ) : formData.accountId && !loadingJiraIssues ? (
+                          <div className="w-full px-2 py-1 text-sm border border-orange-300 rounded bg-orange-50">
+                            <p className="text-orange-700">No open issues found assigned to you.</p>
+                            <p className="text-xs text-orange-600 mt-1">
+                              You can still create a new issue instead.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="w-full px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50 text-gray-500">
+                            Select a Jira account first to load available issues
+                          </div>
+                        )}
+                        
+                        {/* Show selected issue details */}
+                        {formData.existingJiraKey && jiraIssues.length > 0 && (
+                          <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs">
+                            {(() => {
+                              const selectedIssue = jiraIssues.find(issue => issue.key === formData.existingJiraKey);
+                              if (selectedIssue) {
+                                return (
+                                  <div>
+                                    <p><strong>Issue:</strong> {selectedIssue.key}</p>
+                                    <p><strong>Summary:</strong> {selectedIssue.summary}</p>
+                                    <p><strong>Status:</strong> {selectedIssue.status}</p>
+                                    <p><strong>Priority:</strong> {selectedIssue.priority}</p>
+                                    <p><strong>Project:</strong> {selectedIssue.project}</p>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ) : (

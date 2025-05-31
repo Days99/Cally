@@ -1,5 +1,6 @@
 const accountManager = require('../services/accountManager');
 const googleAuthService = require('../services/googleAuth');
+const jiraService = require('../services/jiraService');
 
 class AccountController {
   // Get all accounts for the current user
@@ -179,6 +180,56 @@ class AccountController {
       console.error('Error fetching account stats:', error);
       res.status(500).json({
         error: 'Failed to fetch account stats',
+        message: error.message
+      });
+    }
+  }
+
+  // Get existing Jira issues for linking to events
+  async getJiraIssues(req, res) {
+    try {
+      const userId = req.user.id;
+      const { accountId } = req.params;
+
+      console.log('Fetching Jira issues for user:', userId, 'account:', accountId);
+
+      const issues = await jiraService.getIssues(userId, accountId, {
+        assignee: 'currentUser()',
+        excludeDone: true,
+        maxResults: 100,
+        fields: 'summary,status,assignee,created,updated,priority,issuetype,project'
+      });
+
+      // Format issues for frontend
+      const formattedIssues = issues.issues?.map(issue => ({
+        key: issue.key,
+        summary: issue.fields.summary,
+        status: issue.fields.status.name,
+        statusCategory: issue.fields.status.statusCategory.name,
+        issueType: issue.fields.issuetype.name,
+        priority: issue.fields.priority?.name || 'None',
+        project: issue.fields.project.name,
+        projectKey: issue.fields.project.key,
+        assignee: issue.fields.assignee?.displayName || 'Unassigned',
+        created: issue.fields.created,
+        updated: issue.fields.updated
+      })) || [];
+
+      // Filter out completed issues (those with status category 'Done')
+      const openIssues = formattedIssues.filter(issue => 
+        issue.statusCategory !== 'Done'
+      );
+
+      res.json({
+        success: true,
+        issues: openIssues,
+        total: openIssues.length,
+        message: 'Jira issues fetched successfully'
+      });
+    } catch (error) {
+      console.error('Error fetching Jira issues:', error);
+      res.status(500).json({
+        error: 'Failed to fetch Jira issues',
         message: error.message
       });
     }

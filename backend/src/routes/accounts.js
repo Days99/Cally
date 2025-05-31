@@ -15,6 +15,9 @@ router.get('/provider/:provider', accountController.getAccountsByProvider);
 // Get account statistics
 router.get('/stats', accountController.getAccountStats);
 
+// Get Jira issues for an account
+router.get('/:accountId/jira/issues', accountController.getJiraIssues);
+
 // Add a new Google account
 router.post('/google/add', accountController.addGoogleAccount);
 

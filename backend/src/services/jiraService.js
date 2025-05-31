@@ -185,14 +185,24 @@ class JiraService {
       const {
         assignee = 'currentUser()',
         status = '',
+        excludeDone = false,
         maxResults = 50,
-        fields = 'summary,status,assignee,created,updated,priority,issuetype'
+        fields = 'summary,status,assignee,created,updated,priority,issuetype,project'
       } = options;
 
+      // Build JQL query
       let jql = `assignee = ${assignee}`;
+      
+      // Add status filter if specified
       if (status) {
         jql += ` AND status = "${status}"`;
       }
+      
+      // Optionally exclude done tasks (for event linking)
+      if (excludeDone) {
+        jql += ' AND statusCategory != Done';
+      }
+      
       jql += ' ORDER BY updated DESC';
 
       const response = await axios.get(`https://api.atlassian.com/ex/jira/${cloudId}/rest/api/3/search`, {
@@ -211,6 +221,45 @@ class JiraService {
     } catch (error) {
       console.error('Error fetching Jira issues:', error);
       throw new Error('Failed to fetch Jira issues');
+    }
+  }
+
+  // Get a specific Jira issue by key
+  async getIssue(userId, issueKey, accountId = null) {
+    try {
+      const accessToken = await this.getValidAccessToken(userId, accountId);
+      
+      // Get user's Jira account details
+      const whereClause = { userId, provider: 'jira', isActive: true };
+      if (accountId) whereClause.id = accountId;
+      
+      const account = await Token.findOne({ where: whereClause });
+      if (!account || !account.metadata?.cloudId) {
+        throw new Error('Jira account not found or missing cloud ID');
+      }
+
+      const { cloudId } = account.metadata;
+
+      const response = await axios.get(
+        `https://api.atlassian.com/ex/jira/${cloudId}/rest/api/3/issue/${issueKey}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json'
+          },
+          params: {
+            fields: 'summary,status,assignee,created,updated,priority,issuetype,project'
+          }
+        }
+      );
+
+      return response.data;
+    } catch (error) {
+      if (error.response?.status === 404) {
+        return null; // Issue not found
+      }
+      console.error('Error fetching Jira issue:', error);
+      throw new Error('Failed to fetch Jira issue');
     }
   }
 

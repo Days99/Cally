@@ -26,9 +26,14 @@ router.get('/status', (req, res) => {
 router.get('/calendars', calendarController.getCalendars);
 router.get('/sync-status', calendarController.getSyncStatus);
 
+// Unified sync for all calendar sources (Google + Jira)
+router.post('/sync-all', calendarController.syncAllCalendarSources);
+
+// Sync calendar events (Google Calendar only)
+router.post('/sync/:calendarId?', calendarController.syncEvents);
+
 // Event management (default to primary calendar if not specified)
 router.get('/events/:calendarId?', calendarController.getCalendarEvents);
-router.post('/sync/:calendarId?', calendarController.syncEvents);
 router.post('/events/:calendarId?', calendarController.createEvent);
 router.put('/events/:calendarId/:eventId', calendarController.updateEvent);
 router.delete('/events/:calendarId/:eventId', calendarController.deleteEvent);

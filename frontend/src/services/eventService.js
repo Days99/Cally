@@ -64,6 +64,16 @@ class EventService {
     }
   }
 
+  // Sync Jira task statuses
+  async syncJiraTaskStatuses() {
+    try {
+      const response = await axios.post(`${API_URL}/api/events/sync/jira`);
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to sync Jira task statuses');
+    }
+  }
+
   // Helper method to format events for FullCalendar
   formatEventsForCalendar(events) {
     if (!Array.isArray(events)) {

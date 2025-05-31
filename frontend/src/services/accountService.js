@@ -119,6 +119,19 @@ class AccountService {
       throw new Error(error.response?.data?.message || `Failed to get ${provider} OAuth URL`);
     }
   }
+
+  // Get Jira issues for an account
+  async getJiraIssues(accountId) {
+    try {
+      console.log('🔍 DEBUG: accountService.getJiraIssues() - Making API call to:', `${API_URL}/api/accounts/${accountId}/jira/issues`);
+      const response = await axios.get(`${API_URL}/api/accounts/${accountId}/jira/issues`);
+      console.log('🔍 DEBUG: accountService.getJiraIssues() - Response:', response.data);
+      return response.data.issues;
+    } catch (error) {
+      console.error('🔍 DEBUG: accountService.getJiraIssues() - Error:', error);
+      throw new Error(error.response?.data?.message || 'Failed to fetch Jira issues');
+    }
+  }
 }
 
 const accountService = new AccountService();

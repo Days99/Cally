@@ -65,6 +65,27 @@ class CalendarService {
     }
   }
 
+  // Unified sync for all calendar sources (Google Calendar + Jira Tasks)
+  async syncAllSources(options = {}) {
+    try {
+      const {
+        timeMin,
+        timeMax,
+        maxResults = 250
+      } = options;
+
+      const params = new URLSearchParams();
+      if (timeMin) params.append('timeMin', timeMin);
+      if (timeMax) params.append('timeMax', timeMax);
+      if (maxResults) params.append('maxResults', maxResults.toString());
+
+      const response = await axios.post(`${API_URL}/api/calendar/sync-all?${params}`);
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to sync all calendar sources');
+    }
+  }
+
   // Create a new event
   async createEvent(eventData, calendarId = 'primary') {
     try {
