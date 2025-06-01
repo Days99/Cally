@@ -177,17 +177,100 @@ class EventController {
           });
         }
 
-        // For now, we'll create the event in our database and sync to Jira later
-        // TODO: Implement jiraService.createIssue method
-        eventData.externalId = `MANUAL-${Date.now()}`; // Temporary ID
-        eventData.calendarId = metadata.projectKey;
-        eventData.tokenId = accountId;
-        eventData.syncStatus = 'pending'; // Will sync to Jira later
-        eventData.metadata = {
-          ...metadata,
-          jiraKey: `PENDING-${Date.now()}`,
-          needsJiraSync: true
-        };
+        // Check if we're linking to an existing issue
+        if (metadata.linkExisting && metadata.existingIssueKey) {
+          try {
+            // Fetch the existing Jira issue details
+            const jiraService = require('../services/jiraService');
+            const jiraIssue = await jiraService.getIssue(userId, metadata.existingIssueKey, accountId);
+            
+            if (!jiraIssue) {
+              return res.status(404).json({
+                error: 'Jira issue not found',
+                message: `Issue ${metadata.existingIssueKey} not found or access denied`
+              });
+            }
+
+            // Build the Jira issue URL
+            const cloudId = token.metadata?.cloudId;
+            const issueUrl = `https://${token.metadata?.siteName || 'your-domain'}.atlassian.net/browse/${metadata.existingIssueKey}`;
+            
+            // Use the Jira issue data for the event
+            eventData.title = `${jiraIssue.key}: ${jiraIssue.fields.summary}`;
+            
+            // Handle different Jira description formats (ADF vs plain text)
+            let jiraDescription = 'No description available';
+            if (jiraIssue.fields.description) {
+              if (typeof jiraIssue.fields.description === 'string') {
+                // Plain text description
+                jiraDescription = jiraIssue.fields.description;
+              } else if (jiraIssue.fields.description.content) {
+                // Atlassian Document Format (ADF)
+                jiraDescription = EventController.extractTextFromADF(jiraIssue.fields.description);
+              } else if (jiraIssue.fields.description.text) {
+                // Some API versions return text property
+                jiraDescription = jiraIssue.fields.description.text;
+              }
+            }
+            
+            // Keep user's description as the main event description, store Jira description in metadata
+            eventData.description = description || ''; // User's own description for the event
+            eventData.externalId = jiraIssue.key;
+            eventData.calendarId = jiraIssue.fields.project?.key;
+            eventData.tokenId = accountId;
+            eventData.syncStatus = 'synced';
+            eventData.htmlLink = issueUrl;
+            eventData.metadata = {
+              ...metadata,
+              jiraKey: jiraIssue.key,
+              project: jiraIssue.fields.project?.name,
+              projectKey: jiraIssue.fields.project?.key,
+              issueType: jiraIssue.fields.issuetype?.name,
+              status: jiraIssue.fields.status?.name,
+              statusCategory: jiraIssue.fields.status?.statusCategory?.name,
+              priority: jiraIssue.fields.priority?.name?.toLowerCase(),
+              assignee: jiraIssue.fields.assignee?.displayName,
+              description: jiraDescription,
+              linkExisting: true,
+              originalIssue: {
+                summary: jiraIssue.fields.summary,
+                description: jiraIssue.fields.description,
+                created: jiraIssue.fields.created,
+                updated: jiraIssue.fields.updated
+              }
+            };
+            
+            // Override priority if available from Jira
+            if (jiraIssue.fields.priority?.name) {
+              const priorityMap = {
+                'Highest': 'highest',
+                'High': 'high', 
+                'Medium': 'medium',
+                'Low': 'low',
+                'Lowest': 'lowest'
+              };
+              eventData.priority = priorityMap[jiraIssue.fields.priority.name] || 'medium';
+            }
+            
+          } catch (error) {
+            console.error('Error fetching Jira issue:', error);
+            return res.status(400).json({
+              error: 'Failed to fetch Jira issue',
+              message: error.message
+            });
+          }
+        } else {
+          // For creating new Jira issues (not implemented yet)
+          eventData.externalId = `MANUAL-${Date.now()}`; // Temporary ID
+          eventData.calendarId = metadata.projectKey;
+          eventData.tokenId = accountId;
+          eventData.syncStatus = 'pending'; // Will sync to Jira later
+          eventData.metadata = {
+            ...metadata,
+            jiraKey: `PENDING-${Date.now()}`,
+            needsJiraSync: true
+          };
+        }
       }
 
       // Store in our database (only for non-Google Calendar events)
@@ -415,6 +498,31 @@ class EventController {
         message: error.message
       });
     }
+  }
+
+  // Helper method to extract plain text from Atlassian Document Format (ADF)
+  static extractTextFromADF(adfContent) {
+    if (!adfContent || !adfContent.content) {
+      return '';
+    }
+    
+    let text = '';
+    
+    const extractText = (nodes) => {
+      if (!Array.isArray(nodes)) return '';
+      
+      return nodes.map(node => {
+        if (node.type === 'text') {
+          return node.text || '';
+        } else if (node.content) {
+          return extractText(node.content);
+        }
+        return '';
+      }).join(' ');
+    };
+    
+    text = extractText(adfContent.content);
+    return text.trim();
   }
 }
 

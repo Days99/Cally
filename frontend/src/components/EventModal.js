@@ -136,9 +136,17 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
       if (event && !isCreating) {
         // Editing existing event
         console.log('Loading existing event for editing:', event);
+        
+        // Extract metadata values
+        const metadata = event.extendedProps?.metadata || {};
+        const eventType = event.extendedProps?.eventType || getEventType();
+        
+        // Get account ID from token info
+        const accountId = event.extendedProps?.account?.id || '';
+        
         setFormData({
-          eventType: event.extendedProps?.eventType || getEventType(),
-          title: event.extendedProps?.originalTitle || event.title || '',
+          eventType: eventType,
+          title: event.extendedProps?.originalTitle || event.title?.replace(/^[📅📋🐙📆]\s/, '') || '',
           description: event.extendedProps?.description || '',
           startDateTime: formatDateTimeForInput(event.start),
           endDateTime: formatDateTimeForInput(event.end),
@@ -146,8 +154,27 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
           isAllDay: event.allDay || false,
           priority: event.extendedProps?.priority || 'medium',
           status: event.extendedProps?.status || 'confirmed',
-          // Copy metadata
-          ...event.extendedProps?.metadata
+          accountId: accountId,
+          
+          // Event type specific fields
+          googleCalendarId: metadata.calendarId || 'primary',
+          
+          // Jira specific fields
+          jiraProjectKey: metadata.projectKey || event.extendedProps?.jiraKey?.split('-')[0] || '',
+          jiraIssueType: metadata.issueType || 'Task',
+          assignee: metadata.assignee || event.extendedProps?.assignee || '',
+          jiraAssociationType: metadata.associationType || (event.extendedProps?.jiraKey ? 'existing' : 'create'),
+          existingJiraKey: event.extendedProps?.jiraKey || '',
+          
+          // GitHub specific fields
+          githubRepository: metadata.repository || event.extendedProps?.repository || '',
+          githubIssueNumber: metadata.issueNumber || event.extendedProps?.githubIssue || '',
+          githubLabels: metadata.labels ? (Array.isArray(metadata.labels) ? metadata.labels.join(',') : metadata.labels) : '',
+          githubAssignee: metadata.assignee || event.extendedProps?.assignee || '',
+          githubAssociationType: metadata.associationType || (event.extendedProps?.githubIssue ? 'existing' : 'create'),
+          
+          // Legacy compatibility
+          labels: metadata.labels || []
         });
         setIsEditing(false);
       } else if (isCreating) {
@@ -981,29 +1008,105 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                 <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
                   <h4 className="text-sm font-medium text-blue-900 mb-2">Google Calendar Details</h4>
                   <div className="space-y-2 text-sm">
+                    {event.extendedProps?.metadata?.calendarId && (
+                      <div>
+                        <span className="font-medium text-blue-700">Calendar:</span>
+                        <span className="ml-1 text-blue-600">
+                          {event.extendedProps.metadata.calendarId === 'primary' ? 'Primary Calendar' : event.extendedProps.metadata.calendarId}
+                        </span>
+                      </div>
+                    )}
+                    
+                    {(event?.extendedProps?.description || event?.extendedProps?.metadata?.description || event?.extendedProps?.hangoutLink) && (
+                      <div>
+                        <span className="font-medium text-blue-700">Description:</span>
+                        <div className="ml-1 mt-1 p-2 bg-white rounded border text-blue-800 text-sm max-h-20 overflow-y-auto">
+                          {(event.extendedProps.metadata?.description || event.extendedProps.description) && (
+                            <div>{event.extendedProps.metadata?.description || event.extendedProps.description}</div>
+                          )}
+                          {event.extendedProps?.hangoutLink && (
+                            <div className={`${(event.extendedProps.metadata?.description || event.extendedProps.description) ? 'mt-2 pt-2 border-t border-blue-200' : ''}`}>
+                              <span className="text-blue-700 font-medium">Meeting Link: </span>
+                              <a 
+                                href={event.extendedProps.hangoutLink} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:text-blue-500 underline"
+                              >
+                                📹 {event.extendedProps.hangoutLink}
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    
                     {event.extendedProps?.status && (
                       <div>
                         <span className="font-medium text-blue-700">Status:</span>
-                        <span className="ml-1 text-blue-600 capitalize">{event.extendedProps.status}</span>
+                        <span className={`ml-1 px-2 py-1 rounded-full text-xs font-medium ${
+                          event.extendedProps.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                          event.extendedProps.status === 'tentative' ? 'bg-yellow-100 text-yellow-800' :
+                          event.extendedProps.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {event.extendedProps.status}
+                        </span>
                       </div>
                     )}
+                    
+                    {event.extendedProps?.metadata?.organizer && (
+                      <div>
+                        <span className="font-medium text-blue-700">Organizer:</span>
+                        <span className="ml-1 text-blue-600">
+                          {event.extendedProps.metadata.organizer.displayName || event.extendedProps.metadata.organizer.email}
+                        </span>
+                      </div>
+                    )}
+                    
+                    {event.extendedProps?.metadata?.attendees && event.extendedProps.metadata.attendees.length > 0 && (
+                      <div>
+                        <span className="font-medium text-blue-700">Attendees:</span>
+                        <div className="ml-1 mt-1">
+                          {event.extendedProps.metadata.attendees.slice(0, 3).map((attendee, index) => (
+                            <span key={index} className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full mr-1 mb-1">
+                              {attendee.displayName || attendee.email}
+                            </span>
+                          ))}
+                          {event.extendedProps.metadata.attendees.length > 3 && (
+                            <span className="text-blue-600 text-xs">
+                              +{event.extendedProps.metadata.attendees.length - 3} more
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    
                     {event.extendedProps?.hangoutLink && (
                       <div>
-                        <span className="font-medium text-blue-700">Meet Link:</span>
+                        <span className="font-medium text-blue-700">Meeting:</span>
                         <a 
                           href={event.extendedProps.hangoutLink} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="ml-1 text-blue-600 hover:text-blue-500 underline"
+                          className="ml-1 text-blue-600 hover:text-blue-500 underline text-sm"
                         >
-                          Join Meeting
+                          📹 Join Google Meet
                         </a>
                       </div>
                     )}
+                    
+                    {event.extendedProps?.account && (
+                      <div>
+                        <span className="font-medium text-blue-700">Google Account:</span>
+                        <span className="ml-1 text-blue-600">{event.extendedProps.account.email}</span>
+                      </div>
+                    )}
+                    
                     {event.extendedProps?.lastSyncAt && (
                       <div>
                         <span className="font-medium text-blue-700">Last Synced:</span>
-                        <span className="ml-1 text-blue-600">
+                        <span className="ml-1 text-blue-600 text-xs">
                           {new Date(event.extendedProps.lastSyncAt).toLocaleString()}
                         </span>
                       </div>
@@ -1016,18 +1119,100 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                 <div className="bg-green-50 border border-green-200 rounded-md p-4">
                   <h4 className="text-sm font-medium text-green-900 mb-2">Jira Task Details</h4>
                   <div className="space-y-2 text-sm">
-                    <div>
-                      <span className="font-medium text-green-700">Key:</span>
-                      <span className="ml-1 text-green-600">{event?.extendedProps?.jiraKey}</span>
-                    </div>
-                    <div>
-                      <span className="font-medium text-green-700">Status:</span>
-                      <span className="ml-1 text-green-600">{event?.extendedProps?.status}</span>
-                    </div>
-                    <div>
-                      <span className="font-medium text-green-700">Priority:</span>
-                      <span className="ml-1 text-green-600">{event?.extendedProps?.priority || 'Medium'}</span>
-                    </div>
+                    {event?.extendedProps?.jiraKey && (
+                      <div>
+                        <span className="font-medium text-green-700">Issue Key:</span>
+                        <span className="ml-1 text-green-600 font-mono">{event.extendedProps.jiraKey}</span>
+                      </div>
+                    )}
+                    
+                    {event?.extendedProps?.metadata?.project && (
+                      <div>
+                        <span className="font-medium text-green-700">Project:</span>
+                        <span className="ml-1 text-green-600">{event.extendedProps.metadata.project}</span>
+                      </div>
+                    )}
+                    
+                    {event?.extendedProps?.metadata?.issueType && (
+                      <div>
+                        <span className="font-medium text-green-700">Issue Type:</span>
+                        <span className="ml-1 text-green-600">{event.extendedProps.metadata.issueType}</span>
+                      </div>
+                    )}
+                    
+                    {(event?.extendedProps?.metadata?.description) && (
+                      <div>
+                        <span className="font-medium text-green-700">Jira Description:</span>
+                        <div className="ml-1 mt-1 p-2 bg-white rounded border text-green-800 text-sm max-h-20 overflow-y-auto">
+                          {event.extendedProps.metadata.description}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {event?.extendedProps?.metadata?.status && (
+                      <div>
+                        <span className="font-medium text-green-700">Status:</span>
+                        <span className={`ml-1 px-2 py-1 rounded-full text-xs font-medium ${
+                          event.extendedProps.metadata.statusCategory === 'Done' ? 'bg-green-100 text-green-800' :
+                          event.extendedProps.metadata.statusCategory === 'In Progress' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {event.extendedProps.metadata.status}
+                        </span>
+                      </div>
+                    )}
+                    
+                    {event?.extendedProps?.priority && (
+                      <div>
+                        <span className="font-medium text-green-700">Priority:</span>
+                        <span className={`ml-1 px-2 py-1 rounded-full text-xs font-medium ${
+                          event.extendedProps.priority === 'highest' ? 'bg-red-100 text-red-800' :
+                          event.extendedProps.priority === 'high' ? 'bg-orange-100 text-orange-800' :
+                          event.extendedProps.priority === 'medium' ? 'bg-blue-100 text-blue-800' :
+                          event.extendedProps.priority === 'low' ? 'bg-green-100 text-green-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {event.extendedProps.priority}
+                        </span>
+                      </div>
+                    )}
+                    
+                    {event?.extendedProps?.assignee && (
+                      <div>
+                        <span className="font-medium text-green-700">Assignee:</span>
+                        <span className="ml-1 text-green-600">{event.extendedProps.assignee}</span>
+                      </div>
+                    )}
+                    
+                    {event?.extendedProps?.account && (
+                      <div>
+                        <span className="font-medium text-green-700">Jira Account:</span>
+                        <span className="ml-1 text-green-600">{event.extendedProps.account.name}</span>
+                      </div>
+                    )}
+                    
+                    {event?.extendedProps?.syncStatus && (
+                      <div>
+                        <span className="font-medium text-green-700">Sync Status:</span>
+                        <span className={`ml-1 px-2 py-1 rounded-full text-xs font-medium ${
+                          event.extendedProps.syncStatus === 'synced' ? 'bg-green-100 text-green-800' :
+                          event.extendedProps.syncStatus === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          event.extendedProps.syncStatus === 'error' ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {event.extendedProps.syncStatus}
+                        </span>
+                      </div>
+                    )}
+                    
+                    {event?.extendedProps?.metadata?.lastSynced && (
+                      <div>
+                        <span className="font-medium text-green-700">Last Synced:</span>
+                        <span className="ml-1 text-green-600 text-xs">
+                          {new Date(event.extendedProps.metadata.lastSynced).toLocaleString()}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

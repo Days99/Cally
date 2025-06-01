@@ -105,24 +105,37 @@ class JiraService {
       const token = await Token.findOne({ where: whereClause });
 
       if (!token) {
-        throw new Error(`No Jira token found for user${accountId ? ' and account' : ''}`);
+        throw new Error(`No active Jira token found for user${accountId ? ' and account' : ''}. Please connect your Jira account.`);
       }
 
-      // Check if token is expired
-      if (token.expiresAt && new Date() >= token.expiresAt) {
+      // Check if token is expired or will expire soon (within 5 minutes)
+      const now = new Date();
+      const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
+      
+      if (token.expiresAt && fiveMinutesFromNow >= token.expiresAt) {
+        console.log(`🔄 Jira token expiring soon or expired for user ${userId}, attempting refresh...`);
         // Try to refresh token
-        return await this.refreshAccessToken(userId, accountId);
+        try {
+          return await this.refreshAccessToken(userId, accountId);
+        } catch (refreshError) {
+          // If refresh fails, the token might have been marked as inactive
+          if (refreshError.message.includes('Please reconnect')) {
+            throw refreshError; // Re-throw the user-friendly message
+          }
+          throw new Error('Jira token expired and refresh failed. Please reconnect your Jira account.');
+        }
       }
 
       return token.accessToken;
     } catch (error) {
-      console.error('Error getting valid Jira access token:', error);
+      console.error('Error getting valid Jira access token:', error.message);
       throw error;
     }
   }
 
   // Refresh Jira access token
   async refreshAccessToken(userId, accountId = null) {
+    let token = null;
     try {
       const whereClause = { userId, provider: 'jira', isActive: true };
       
@@ -132,9 +145,13 @@ class JiraService {
         whereClause.isPrimary = true;
       }
 
-      const token = await Token.findOne({ where: whereClause });
+      token = await Token.findOne({ where: whereClause });
 
-      if (!token || !token.refreshToken) {
+      if (!token) {
+        throw new Error('No Jira token found');
+      }
+
+      if (!token.refreshToken) {
         throw new Error('No refresh token found');
       }
 
@@ -144,6 +161,8 @@ class JiraService {
         client_secret: process.env.JIRA_CLIENT_SECRET,
         refresh_token: token.refreshToken
       });
+
+      console.log(`🔄 Refreshing Jira access token for user ${userId}${accountId ? `, account ${accountId}` : ''}`);
 
       const response = await axios.post('https://auth.atlassian.com/oauth/token', params, {
         headers: {
@@ -157,12 +176,32 @@ class JiraService {
       await token.update({
         accessToken: access_token,
         refreshToken: refresh_token || token.refreshToken,
-        expiresAt: expires_in ? new Date(Date.now() + expires_in * 1000) : null
+        expiresAt: expires_in ? new Date(Date.now() + expires_in * 1000) : null,
+        lastRefreshedAt: new Date()
       });
 
+      console.log(`✅ Successfully refreshed Jira access token for user ${userId}`);
       return access_token;
     } catch (error) {
-      console.error('Error refreshing Jira access token:', error);
+      console.error('❌ Error refreshing Jira access token:', error.response?.data || error.message);
+      
+      // If we have a token and the refresh failed due to invalid refresh token,
+      // mark the token as inactive so user needs to re-authenticate
+      if (token && (
+        error.response?.status === 400 || 
+        error.response?.status === 401 ||
+        error.message.includes('No refresh token found') ||
+        error.response?.data?.error === 'invalid_grant'
+      )) {
+        console.log(`🔒 Marking Jira token as inactive for user ${userId} due to refresh failure`);
+        await token.update({ 
+          isActive: false,
+          deactivatedAt: new Date(),
+          deactivationReason: 'refresh_token_invalid'
+        });
+        throw new Error('Jira token expired and cannot be refreshed. Please reconnect your Jira account.');
+      }
+      
       throw new Error('Failed to refresh access token');
     }
   }
@@ -187,7 +226,7 @@ class JiraService {
         status = '',
         excludeDone = false,
         maxResults = 50,
-        fields = 'summary,status,assignee,created,updated,priority,issuetype,project'
+        fields = 'summary,description,status,assignee,created,updated,priority,issuetype,project,timetracking'
       } = options;
 
       // Build JQL query
@@ -219,7 +258,22 @@ class JiraService {
 
       return response.data;
     } catch (error) {
-      console.error('Error fetching Jira issues:', error);
+      // Handle authentication errors specifically
+      if (error.message.includes('Please reconnect') || error.message.includes('Please connect')) {
+        console.error('🔒 Jira authentication required:', error.message);
+        throw error; // Re-throw the user-friendly message
+      }
+      
+      // Handle API errors
+      if (error.response?.status === 401) {
+        throw new Error('Jira authentication failed. Please reconnect your Jira account.');
+      }
+      
+      if (error.response?.status === 403) {
+        throw new Error('Insufficient permissions to access Jira. Please check your account permissions.');
+      }
+      
+      console.error('Error fetching Jira issues:', error.response?.data || error.message);
       throw new Error('Failed to fetch Jira issues');
     }
   }
@@ -248,7 +302,7 @@ class JiraService {
             'Accept': 'application/json'
           },
           params: {
-            fields: 'summary,status,assignee,created,updated,priority,issuetype,project'
+            fields: 'summary,description,status,assignee,created,updated,priority,issuetype,project,timetracking'
           }
         }
       );
@@ -258,7 +312,19 @@ class JiraService {
       if (error.response?.status === 404) {
         return null; // Issue not found
       }
-      console.error('Error fetching Jira issue:', error);
+      
+      // Handle authentication errors specifically
+      if (error.message.includes('Please reconnect') || error.message.includes('Please connect')) {
+        console.error('🔒 Jira authentication required:', error.message);
+        throw error; // Re-throw the user-friendly message
+      }
+      
+      // Handle API errors
+      if (error.response?.status === 401) {
+        throw new Error('Jira authentication failed. Please reconnect your Jira account.');
+      }
+      
+      console.error('Error fetching Jira issue:', error.response?.data || error.message);
       throw new Error('Failed to fetch Jira issue');
     }
   }
@@ -397,6 +463,69 @@ class JiraService {
     } catch (error) {
       console.error('Error creating/updating Jira account:', error);
       throw new Error('Failed to create or update Jira account');
+    }
+  }
+
+  // Check if Jira connection is healthy
+  async checkConnectionHealth(userId, accountId = null) {
+    try {
+      const whereClause = { userId, provider: 'jira', isActive: true };
+      
+      if (accountId) {
+        whereClause.id = accountId;
+      } else {
+        whereClause.isPrimary = true;
+      }
+
+      const token = await Token.findOne({ where: whereClause });
+
+      if (!token) {
+        return {
+          healthy: false,
+          status: 'not_connected',
+          message: 'No Jira account connected'
+        };
+      }
+
+      if (!token.refreshToken) {
+        return {
+          healthy: false,
+          status: 'invalid_token',
+          message: 'Token missing refresh capability - reconnection required'
+        };
+      }
+
+      // Check if token will expire soon
+      const now = new Date();
+      const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
+      
+      if (token.expiresAt && oneHourFromNow >= token.expiresAt) {
+        return {
+          healthy: false,
+          status: 'expires_soon',
+          message: 'Token expires soon and may need refresh'
+        };
+      }
+
+      return {
+        healthy: true,
+        status: 'connected',
+        message: 'Jira connection is healthy',
+        account: {
+          id: token.id,
+          name: token.name,
+          email: token.email,
+          lastRefreshedAt: token.lastRefreshedAt,
+          expiresAt: token.expiresAt
+        }
+      };
+    } catch (error) {
+      console.error('Error checking Jira connection health:', error);
+      return {
+        healthy: false,
+        status: 'error',
+        message: 'Error checking connection health'
+      };
     }
   }
 }

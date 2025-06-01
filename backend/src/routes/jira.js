@@ -12,6 +12,10 @@ router.use(authenticateToken);
 // Jira OAuth routes
 router.post('/auth', jiraController.getAuthUrl);
 
+// Connection health check
+router.get('/health', jiraController.checkHealth);
+router.get('/health/:accountId', jiraController.checkHealth);
+
 // Issue management routes
 router.get('/issues', jiraController.getAllIssues);
 router.get('/issues/:accountId', jiraController.getIssues);

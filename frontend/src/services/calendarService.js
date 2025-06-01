@@ -138,29 +138,37 @@ class CalendarService {
   // Helper method to format events for FullCalendar
   formatEventsForCalendar(events) {
     return events.map(event => {
-      // Determine event type and styling
-      let backgroundColor, borderColor, textColor, icon;
+      // Determine event type and styling based on the eventType field
+      let backgroundColor, borderColor, textColor, icon, eventType;
       
-      if (event.googleEventId) {
-        // Google Calendar events
+      // Determine event type from the new unified structure
+      if (event.eventType === 'google_calendar' || event.googleEventId) {
+        eventType = 'google_calendar';
         backgroundColor = '#4285f4';
         borderColor = '#3367d6';
         textColor = '#ffffff';
         icon = '📅';
-      } else if (event.jiraKey) {
-        // Jira task events
+      } else if (event.eventType === 'jira_task' || event.jiraKey || event.externalId?.startsWith('JIRA-') || event.metadata?.jiraKey) {
+        eventType = 'jira_task';
         backgroundColor = '#0052cc';
         borderColor = '#0043a8';
         textColor = '#ffffff';
         icon = '📋';
-      } else if (event.githubIssue) {
-        // GitHub issue events
+      } else if (event.eventType === 'github_issue' || event.githubIssue) {
+        eventType = 'github_issue';
         backgroundColor = '#6f42c1';
         borderColor = '#5a2d9d';
         textColor = '#ffffff';
         icon = '🐙';
+      } else if (event.eventType === 'manual') {
+        eventType = 'manual';
+        backgroundColor = '#6b7280';
+        borderColor = '#4b5563';
+        textColor = '#ffffff';
+        icon = '📆';
       } else {
         // Default/unknown events
+        eventType = 'unknown';
         backgroundColor = '#6b7280';
         borderColor = '#4b5563';
         textColor = '#ffffff';
@@ -170,33 +178,42 @@ class CalendarService {
       return {
         id: event.id,
         title: `${icon} ${event.title}`,
-        start: event.startDateTime,
-        end: event.endDateTime,
+        start: event.startTime || event.startDateTime,
+        end: event.endTime || event.endDateTime,
         allDay: event.isAllDay,
         url: event.htmlLink,
         extendedProps: {
           description: event.description,
           location: event.location,
           status: event.status,
-          hangoutLink: event.hangoutLink,
-          googleEventId: event.googleEventId,
-          jiraKey: event.jiraKey,
-          githubIssue: event.githubIssue,
-          repository: event.repository,
-          assignee: event.assignee,
           priority: event.priority,
+          eventType: eventType,
+          metadata: event.metadata || {},
+          syncStatus: event.syncStatus,
+          
+          // Legacy support for backward compatibility
+          hangoutLink: event.hangoutLink || event.metadata?.hangoutLink,
+          googleEventId: event.googleEventId || (event.eventType === 'google_calendar' ? event.externalId : null),
+          jiraKey: event.jiraKey || event.metadata?.jiraKey || (event.eventType === 'jira_task' ? event.externalId : null),
+          githubIssue: event.githubIssue || event.metadata?.githubIssue,
+          repository: event.repository || event.metadata?.repository,
+          assignee: event.assignee || event.metadata?.assignee,
+          
+          // Account information
+          account: event.token ? {
+            id: event.token.id || event.tokenId,
+            name: event.token.accountName,
+            email: event.token.accountEmail,
+            provider: event.token.provider
+          } : null,
+          
           lastSyncAt: event.lastSyncAt,
           originalTitle: event.title, // Store original title without icon
-          eventType: event.googleEventId ? 'google' : 
-                    event.jiraKey ? 'jira' : 
-                    event.githubIssue ? 'github' : 'unknown'
         },
-        backgroundColor,
-        borderColor,
-        textColor,
-        classNames: [`event-${event.googleEventId ? 'google' : 
-                      event.jiraKey ? 'jira' : 
-                      event.githubIssue ? 'github' : 'unknown'}`]
+        backgroundColor: event.color || backgroundColor,
+        borderColor: borderColor,
+        textColor: textColor,
+        classNames: [`event-${eventType}`]
       };
     });
   }

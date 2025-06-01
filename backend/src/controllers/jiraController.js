@@ -92,6 +92,23 @@ class JiraController {
       });
     } catch (error) {
       console.error('Error fetching Jira issues:', error);
+      
+      // Handle authentication errors with specific status codes
+      if (error.message.includes('Please reconnect') || error.message.includes('Please connect')) {
+        return res.status(401).json({
+          error: 'Authentication required',
+          message: error.message,
+          requiresReconnection: true
+        });
+      }
+      
+      if (error.message.includes('Insufficient permissions')) {
+        return res.status(403).json({
+          error: 'Insufficient permissions',
+          message: error.message
+        });
+      }
+      
       res.status(500).json({
         error: 'Failed to fetch issues',
         message: error.message
@@ -120,12 +137,15 @@ class JiraController {
           success: true,
           issues: [],
           total: 0,
-          message: 'No Jira accounts connected'
+          message: 'No Jira accounts connected',
+          requiresConnection: true
         });
       }
 
       // Fetch issues from all accounts
       const allIssues = [];
+      const failedAccounts = [];
+      
       for (const account of accounts) {
         try {
           const issues = await jiraService.getIssues(userId, account.id, {
@@ -145,16 +165,32 @@ class JiraController {
           allIssues.push(...issuesWithAccount);
         } catch (error) {
           console.error(`Error fetching issues for account ${account.id}:`, error);
-          // Continue with other accounts
+          
+          // Track failed accounts for better user feedback
+          failedAccounts.push({
+            accountId: account.id,
+            accountName: account.accountName,
+            error: error.message,
+            requiresReconnection: error.message.includes('Please reconnect') || error.message.includes('Please connect')
+          });
         }
       }
 
-      res.json({
+      const response = {
         success: true,
         issues: allIssues,
         total: allIssues.length,
         message: 'Issues fetched successfully from all accounts'
-      });
+      };
+
+      // Add failed accounts info if any
+      if (failedAccounts.length > 0) {
+        response.partialFailure = true;
+        response.failedAccounts = failedAccounts;
+        response.message = `Issues fetched from ${accounts.length - failedAccounts.length}/${accounts.length} accounts`;
+      }
+
+      res.json(response);
     } catch (error) {
       console.error('Error fetching all Jira issues:', error);
       res.status(500).json({
@@ -210,6 +246,31 @@ class JiraController {
       console.error('Error fetching issue transitions:', error);
       res.status(500).json({
         error: 'Failed to fetch transitions',
+        message: error.message
+      });
+    }
+  }
+
+  // Check Jira connection health
+  async checkHealth(req, res) {
+    try {
+      const userId = req.user.id;
+      const { accountId } = req.params;
+
+      const health = await jiraService.checkConnectionHealth(userId, accountId);
+
+      const statusCode = health.healthy ? 200 : 
+                        health.status === 'not_connected' ? 404 : 401;
+
+      res.status(statusCode).json({
+        success: health.healthy,
+        health,
+        message: health.message
+      });
+    } catch (error) {
+      console.error('Error checking Jira health:', error);
+      res.status(500).json({
+        error: 'Failed to check connection health',
         message: error.message
       });
     }
