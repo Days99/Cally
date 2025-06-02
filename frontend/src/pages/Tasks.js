@@ -532,8 +532,14 @@ const Tasks = () => {
       if (metadata.assignableUsers.length > 0) {
         // Keep existing assignee if it's valid, otherwise clear
         const isValidAssignee = hasContent(newIssueForm.assignee) && metadata.assignableUsers.some(user => 
-          user.emailAddress === newIssueForm.assignee || user.accountId === newIssueForm.assignee
+          user.accountId === newIssueForm.assignee
         );
+        console.log('Assignee validation:', {
+          currentAssignee: newIssueForm.assignee,
+          hasContent: hasContent(newIssueForm.assignee),
+          availableUsers: metadata.assignableUsers.map(u => ({ accountId: u.accountId, displayName: u.displayName })),
+          isValidAssignee
+        });
         if (!isValidAssignee) {
           updates.assignee = '';
         }
@@ -1162,8 +1168,8 @@ const Tasks = () => {
                       >
                         <option value="">Unassigned</option>
                         {projectMetadata.assignableUsers.map(user => (
-                          <option key={user.accountId} value={user.emailAddress || user.accountId}>
-                            {user.displayName} ({user.emailAddress})
+                          <option key={user.accountId} value={user.accountId}>
+                            {user.displayName} ({user.emailAddress || user.accountId})
                           </option>
                         ))}
                       </select>

@@ -861,21 +861,27 @@ class JiraService {
       if (hasContent(assignee)) {
         const trimmedAssignee = assignee.trim();
         
+        console.log('Processing assignee:', trimmedAssignee);
+        
         // Handle assignee by email, account ID, or username
         if (trimmedAssignee.includes('@')) {
           // Assign by email address
+          console.log('Assigning by email address');
           issuePayload.fields.assignee = {
             emailAddress: trimmedAssignee
           };
-        } else if (trimmedAssignee.includes(':') || trimmedAssignee.length > 10) {
-          // Assign by account ID (Atlassian account IDs are long strings)
+        } else if (trimmedAssignee.includes(':') || trimmedAssignee.length >= 24) {
+          // Assign by account ID (Atlassian account IDs are typically 24+ chars and may contain colons)
+          console.log('Assigning by account ID');
           issuePayload.fields.assignee = {
             accountId: trimmedAssignee
           };
         } else {
-          // Assign by username (fallback)
+          // For shorter strings without @ or :, assume it's an account ID anyway (modern Jira)
+          // Account IDs are the preferred method in modern Jira
+          console.log('Assigning by account ID (fallback)');
           issuePayload.fields.assignee = {
-            name: trimmedAssignee
+            accountId: trimmedAssignee
           };
         }
       }
