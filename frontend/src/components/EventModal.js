@@ -191,8 +191,9 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
           baseDate = new Date();
         }
         
-        const startTime = baseDate.toISOString().slice(0, 16);
-        const endTime = new Date(baseDate.getTime() + 60 * 60 * 1000).toISOString().slice(0, 16);
+        // Use local time formatting to prevent timezone shifts
+        const startTime = formatLocalDateTime(baseDate);
+        const endTime = formatLocalDateTime(new Date(baseDate.getTime() + 60 * 60 * 1000));
           
         console.log('Setting form data with:', { startTime, endTime });
         
@@ -253,6 +254,7 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
         return '';
       }
       
+      // Use local time instead of UTC to prevent timezone shifts
       const year = d.getFullYear();
       const month = String(d.getMonth() + 1).padStart(2, '0');
       const day = String(d.getDate()).padStart(2, '0');
@@ -263,6 +265,23 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
       console.error('Error formatting date for input:', error, 'Date value:', date);
       return '';
     }
+  };
+
+  // Helper function to format date for datetime-local input (local time)
+  const formatLocalDateTime = (date) => {
+    if (!date) return '';
+    
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return '';
+    
+    // Format as YYYY-MM-DDTHH:MM in local time
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
 
   const getEventTypeDisplay = () => {
@@ -330,12 +349,22 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
       setIsSaving(true);
       setError(null);
       
+      // Helper function to convert datetime-local string to ISO string in local timezone
+      const formatDateTimeForBackend = (dateTimeString) => {
+        if (!dateTimeString) return null;
+        
+        // dateTimeString is in format "YYYY-MM-DDTHH:MM" (local time)
+        // We need to create a Date object that represents this local time
+        const date = new Date(dateTimeString);
+        return date.toISOString();
+      };
+      
       const eventData = {
         eventType: formData.eventType,
         title: formData.title,
         description: formData.description,
-        startTime: formData.isAllDay ? formData.startDateTime.split('T')[0] : formData.startDateTime,
-        endTime: formData.isAllDay ? formData.endDateTime.split('T')[0] : formData.endDateTime,
+        startTime: formData.isAllDay ? formData.startDateTime.split('T')[0] : formatDateTimeForBackend(formData.startDateTime),
+        endTime: formData.isAllDay ? formData.endDateTime.split('T')[0] : formatDateTimeForBackend(formData.endDateTime),
         location: formData.location,
         isAllDay: formData.isAllDay,
         priority: formData.priority,
@@ -343,6 +372,8 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
         metadata: {},
         accountId: formData.accountId
       };
+
+      console.log('Sending event data to backend:', eventData);
 
       // Add event-type specific metadata
       if (formData.eventType === 'jira_task') {

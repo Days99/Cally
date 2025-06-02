@@ -433,18 +433,35 @@ const Tasks = () => {
     // Handle calendar event checkbox - set smart defaults when enabled or clear when disabled
     if (name === 'createCalendarEvent') {
       if (checked) {
+        // Use async function to get truly available time
         const now = new Date();
-        const nextHour = getNextAvailableHour(now);
-        const defaultEndTime = new Date(nextHour.getTime() + 60 * 60 * 1000); // 1 hour later
-        
-        setNewIssueForm(prev => ({
-          ...prev,
-          [name]: checked,
-          eventDate: nextHour.toISOString().split('T')[0], // YYYY-MM-DD format
-          eventStartTime: nextHour.toTimeString().slice(0, 5), // HH:MM format
-          eventEndTime: defaultEndTime.toTimeString().slice(0, 5), // HH:MM format
-          eventTitle: prev.summary || '' // Use current summary as default title
-        }));
+        getNextAvailableHour(now).then(nextHour => {
+          const defaultEndTime = new Date(nextHour.getTime() + 60 * 60 * 1000); // 1 hour later
+          
+          setNewIssueForm(prev => ({
+            ...prev,
+            [name]: checked,
+            eventDate: nextHour.toISOString().split('T')[0], // YYYY-MM-DD format
+            eventStartTime: nextHour.toTimeString().slice(0, 5), // HH:MM format
+            eventEndTime: defaultEndTime.toTimeString().slice(0, 5), // HH:MM format
+            eventTitle: prev.summary || '' // Use current summary as default title
+          }));
+        }).catch(error => {
+          console.error('Error getting available time:', error);
+          // Fallback to simple next hour if smart scheduling fails
+          const simpleNextHour = new Date(now);
+          simpleNextHour.setHours(simpleNextHour.getHours() + 1, 0, 0, 0);
+          const simpleEndTime = new Date(simpleNextHour.getTime() + 60 * 60 * 1000);
+          
+          setNewIssueForm(prev => ({
+            ...prev,
+            [name]: checked,
+            eventDate: simpleNextHour.toISOString().split('T')[0],
+            eventStartTime: simpleNextHour.toTimeString().slice(0, 5),
+            eventEndTime: simpleEndTime.toTimeString().slice(0, 5),
+            eventTitle: prev.summary || ''
+          }));
+        });
       } else {
         // Clear calendar event fields when unchecked
         setNewIssueForm(prev => ({
@@ -573,46 +590,112 @@ const Tasks = () => {
     }
   };
 
-  // Calculate the next available hour for smart scheduling
-  const getNextAvailableHour = (currentDate) => {
-    const nextHour = new Date(currentDate);
+  // Calculate the next available hour for smart scheduling, considering existing events
+  const getNextAvailableHour = async (currentDate) => {
+    const now = new Date(currentDate);
     
-    // Round up to the next hour
-    nextHour.setMinutes(0, 0, 0); // Reset minutes, seconds, milliseconds
-    nextHour.setHours(nextHour.getHours() + 1);
+    // Start from next hour
+    let candidateTime = new Date(now);
+    candidateTime.setMinutes(0, 0, 0); // Reset minutes, seconds, milliseconds
+    candidateTime.setHours(candidateTime.getHours() + 1);
     
-    // Check if it's weekend (Saturday = 6, Sunday = 0)
-    const dayOfWeek = nextHour.getDay();
-    if (dayOfWeek === 0 || dayOfWeek === 6) {
-      // Schedule for next Monday at 9 AM
-      const daysUntilMonday = dayOfWeek === 0 ? 1 : 2; // Sunday = 1 day, Saturday = 2 days
-      nextHour.setDate(nextHour.getDate() + daysUntilMonday);
-      nextHour.setHours(9, 0, 0, 0);
-      return nextHour;
-    }
+    // Define business hours
+    const BUSINESS_START = 8; // 8 AM
+    const BUSINESS_END = 18;  // 6 PM
     
-    // If it's late evening (after 6 PM) or early morning (before 8 AM), 
-    // schedule for next business day at 9 AM
-    const hour = nextHour.getHours();
-    if (hour >= 18 || hour < 8) {
-      // Set to next day at 9 AM if current time is outside business hours
-      const tomorrow = new Date(nextHour);
-      if (hour >= 18) {
-        tomorrow.setDate(tomorrow.getDate() + 1);
-      }
-      tomorrow.setHours(9, 0, 0, 0);
+    // Helper function to check if time is within business hours and not weekend
+    const isBusinessTime = (date) => {
+      const day = date.getDay();
+      const hour = date.getHours();
+      return day !== 0 && day !== 6 && hour >= BUSINESS_START && hour < BUSINESS_END;
+    };
+    
+    // Helper function to move to next business day at 9 AM
+    const moveToNextBusinessDay = (date) => {
+      const nextDay = new Date(date);
+      nextDay.setDate(nextDay.getDate() + 1);
+      nextDay.setHours(9, 0, 0, 0);
       
-      // Check if tomorrow is weekend and adjust accordingly
-      const tomorrowDayOfWeek = tomorrow.getDay();
-      if (tomorrowDayOfWeek === 0 || tomorrowDayOfWeek === 6) {
-        const daysUntilMonday = tomorrowDayOfWeek === 0 ? 1 : 2;
-        tomorrow.setDate(tomorrow.getDate() + daysUntilMonday);
+      // Skip weekends
+      while (nextDay.getDay() === 0 || nextDay.getDay() === 6) {
+        nextDay.setDate(nextDay.getDate() + 1);
       }
       
-      return tomorrow;
+      return nextDay;
+    };
+    
+    // If not in business hours, move to next business day
+    if (!isBusinessTime(candidateTime)) {
+      candidateTime = moveToNextBusinessDay(candidateTime);
     }
     
-    return nextHour;
+    // Try to fetch existing events for the candidate date
+    try {
+      const candidateDate = candidateTime.toISOString().split('T')[0];
+      const existingEvents = await eventService.getEvents({
+        startDate: candidateDate,
+        endDate: candidateDate
+      });
+      
+      console.log('Checking for conflicts on', candidateDate, '- found', existingEvents.length, 'events');
+      
+      // Check for conflicts and find next available slot
+      let maxAttempts = 24; // Prevent infinite loop
+      let attempts = 0;
+      
+      while (attempts < maxAttempts) {
+        // Check if current candidateTime conflicts with any existing event
+        const candidateStart = candidateTime.getTime();
+        const candidateEnd = candidateStart + (60 * 60 * 1000); // 1 hour later
+        
+        const hasConflict = existingEvents.some(event => {
+          if (event.isAllDay) return true; // Avoid all-day events
+          
+          if (!event.startTime || !event.endTime) return false;
+          
+          const eventStart = new Date(event.startTime).getTime();
+          const eventEnd = new Date(event.endTime).getTime();
+          
+          // Check for overlap
+          return (candidateStart < eventEnd && candidateEnd > eventStart);
+        });
+        
+        if (!hasConflict) {
+          console.log('Found available slot at:', candidateTime.toLocaleString());
+          return candidateTime;
+        }
+        
+        // Move to next hour
+        candidateTime.setHours(candidateTime.getHours() + 1);
+        
+        // If we've moved past business hours, go to next business day
+        if (!isBusinessTime(candidateTime)) {
+          candidateTime = moveToNextBusinessDay(candidateTime);
+          
+          // If we've moved to a new day, fetch events for that day
+          const newDate = candidateTime.toISOString().split('T')[0];
+          if (newDate !== candidateDate) {
+            const newEvents = await eventService.getEvents({
+              startDate: newDate,
+              endDate: newDate
+            });
+            existingEvents.length = 0;
+            existingEvents.push(...newEvents);
+            console.log('Moved to new day', newDate, '- found', existingEvents.length, 'events');
+          }
+        }
+        
+        attempts++;
+      }
+      
+      console.warn('Could not find available slot after', maxAttempts, 'attempts');
+      return candidateTime; // Return last attempt
+      
+    } catch (error) {
+      console.error('Error fetching events for smart scheduling:', error);
+      // Fallback to simple logic if API fails
+      return candidateTime;
+    }
   };
 
   const loadProjects = async (accountId) => {
