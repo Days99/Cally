@@ -251,6 +251,74 @@ class JiraController {
     }
   }
 
+  // Get Jira workflow preferences
+  async getWorkflowPreferences(req, res) {
+    try {
+      const userId = req.user.id;
+      const { User } = require('../models');
+      
+      const user = await User.findByPk(userId);
+      const jiraWorkflow = user.preferences?.jiraWorkflow || {
+        enabled: false,
+        statusActions: {
+          // Default workflow actions (can be customized)
+          'To Do': null, // No action when moving to backlog
+          'In Progress': 'developing', // Move to "In Progress" when working on it
+          'In Review': 'review', // Move to "In Review" when ready for review  
+          'Done': 'done' // Move to "Done" when completed
+        },
+        deleteEventOnComplete: true, // Delete calendar event when Jira task is marked as Done
+        createEventOnAssign: false // Automatically create calendar event when assigned
+      };
+
+      res.json({
+        success: true,
+        workflow: jiraWorkflow,
+        message: 'Jira workflow preferences retrieved successfully'
+      });
+    } catch (error) {
+      console.error('Error getting Jira workflow preferences:', error);
+      res.status(500).json({
+        error: 'Failed to get workflow preferences',
+        message: error.message
+      });
+    }
+  }
+
+  // Update Jira workflow preferences
+  async updateWorkflowPreferences(req, res) {
+    try {
+      const userId = req.user.id;
+      const { User } = require('../models');
+      const { workflow } = req.body;
+
+      const user = await User.findByPk(userId);
+      
+      // Update preferences
+      const updatedPreferences = {
+        ...user.preferences,
+        jiraWorkflow: {
+          ...user.preferences?.jiraWorkflow,
+          ...workflow
+        }
+      };
+
+      await user.update({ preferences: updatedPreferences });
+
+      res.json({
+        success: true,
+        workflow: updatedPreferences.jiraWorkflow,
+        message: 'Jira workflow preferences updated successfully'
+      });
+    } catch (error) {
+      console.error('Error updating Jira workflow preferences:', error);
+      res.status(500).json({
+        error: 'Failed to update workflow preferences',
+        message: error.message
+      });
+    }
+  }
+
   // Check Jira connection health
   async checkHealth(req, res) {
     try {

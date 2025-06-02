@@ -466,6 +466,53 @@ class JiraService {
     }
   }
 
+  // Get available workflows for a project (for configuration)
+  async getProjectWorkflows(userId, projectKey, accountId = null) {
+    try {
+      const accessToken = await this.getValidAccessToken(userId, accountId);
+      
+      const whereClause = { userId, provider: 'jira', isActive: true };
+      if (accountId) whereClause.id = accountId;
+      
+      const account = await Token.findOne({ where: whereClause });
+      if (!account || !account.metadata?.cloudId) {
+        throw new Error('Jira account not found or missing cloud ID');
+      }
+
+      const { cloudId } = account.metadata;
+
+      // Get project info first
+      const projectResponse = await axios.get(
+        `https://api.atlassian.com/ex/jira/${cloudId}/rest/api/3/project/${projectKey}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json'
+          }
+        }
+      );
+
+      // Get issue types for the project
+      const issueTypesResponse = await axios.get(
+        `https://api.atlassian.com/ex/jira/${cloudId}/rest/api/3/project/${projectKey}/statuses`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json'
+          }
+        }
+      );
+
+      return {
+        project: projectResponse.data,
+        issueTypes: issueTypesResponse.data
+      };
+    } catch (error) {
+      console.error('Error getting Jira project workflows:', error);
+      throw new Error('Failed to get project workflows');
+    }
+  }
+
   // Check if Jira connection is healthy
   async checkConnectionHealth(userId, accountId = null) {
     try {

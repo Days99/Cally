@@ -132,6 +132,34 @@ class AccountService {
       throw new Error(error.response?.data?.message || 'Failed to fetch Jira issues');
     }
   }
+
+  // Get available transitions for a Jira issue
+  async getJiraIssueTransitions(accountId, issueKey) {
+    try {
+      console.log('🔍 DEBUG: accountService.getJiraIssueTransitions() - Making API call to:', `${API_URL}/api/jira/issues/${accountId}/${issueKey}/transitions`);
+      const response = await axios.get(`${API_URL}/api/jira/issues/${accountId}/${issueKey}/transitions`);
+      console.log('🔍 DEBUG: accountService.getJiraIssueTransitions() - Response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('🔍 DEBUG: accountService.getJiraIssueTransitions() - Error:', error);
+      throw new Error(error.response?.data?.message || 'Failed to fetch Jira transitions');
+    }
+  }
+
+  // Update Jira issue status using transition ID
+  async updateJiraIssueStatus(accountId, issueKey, transitionId) {
+    try {
+      console.log('🔍 DEBUG: accountService.updateJiraIssueStatus() - Making API call to:', `${API_URL}/api/jira/issues/${accountId}/${issueKey}/status`);
+      const response = await axios.put(`${API_URL}/api/jira/issues/${accountId}/${issueKey}/status`, {
+        transitionId
+      });
+      console.log('🔍 DEBUG: accountService.updateJiraIssueStatus() - Response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('🔍 DEBUG: accountService.updateJiraIssueStatus() - Error:', error);
+      throw new Error(error.response?.data?.message || 'Failed to update Jira issue status');
+    }
+  }
 }
 
 const accountService = new AccountService();

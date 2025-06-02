@@ -411,15 +411,8 @@ class EventController {
             event.externalId
           );
         }
-      } else if (event.eventType === 'jira_task' && event.externalId) {
-        // For Jira, we might just update status to "cancelled" instead of deleting
-        await jiraService.updateIssueStatus(
-          userId,
-          event.externalId,
-          'cancelled',
-          event.tokenId
-        );
-      }
+      } 
+      // For Jira events, we just delete the calendar event and leave the Jira issue untouched
 
       // Delete from our database
       await event.destroy();

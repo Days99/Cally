@@ -12,6 +12,10 @@ router.use(authenticateToken);
 // Jira OAuth routes
 router.post('/auth', jiraController.getAuthUrl);
 
+// Workflow preferences
+router.get('/workflow', jiraController.getWorkflowPreferences);
+router.put('/workflow', jiraController.updateWorkflowPreferences);
+
 // Connection health check
 router.get('/health', jiraController.checkHealth);
 router.get('/health/:accountId', jiraController.checkHealth);
