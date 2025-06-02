@@ -6,18 +6,41 @@ A modern web application that integrates Google Calendar, Jira, and GitHub into 
 
 Cally allows users to:
 - View Google Calendar events in a unified interface
-- Drag and drop Jira tasks and GitHub items onto calendar slots
-- Save task-to-calendar assignments
+- Manage Jira tasks with dynamic workflow transitions
+- Create and link events across different platforms (Google Calendar, Jira, GitHub)
 - Access from both mobile and desktop devices
+- Real-time task status management using project-specific workflows
 
-## 🚀 MVP Features
+## 🚀 Current Features
 
 - **Google Authentication** - OAuth 2.0 login with calendar access
 - **Calendar View** - Interactive calendar powered by FullCalendar.js
-- **Jira Integration** - Read-only sync of user's issues and tasks
-- **GitHub Integration** - Sync assigned issues, PRs, and commit activity
-- **Task Scheduling** - Drag-and-drop task assignment to calendar slots
-- **Unified Dashboard** - Combined task list and timeline view
+- **Jira Integration** - Full OAuth integration with dynamic status transitions
+- **Unified Event System** - Create events for Google Calendar, Jira tasks, or manual events
+- **Tasks Management** - Dedicated Tasks tab with expandable task details
+- **Dynamic Workflows** - Real Jira workflow transitions (no hardcoded statuses)
+- **Multi-Account Support** - Connect multiple accounts per service
+- **Real-time Sync** - Automatic status updates and calendar synchronization
+
+## ✨ Key Features
+
+### 🔄 Dynamic Jira Transitions
+- **Project-specific workflows**: Uses actual Jira project workflows instead of hardcoded statuses
+- **Real-time transitions**: Change task status using your project's actual workflow steps
+- **Permission-aware**: Only shows transitions you're allowed to make
+- **Auto-cleanup**: Completed tasks automatically remove linked calendar events
+
+### 📅 Unified Event Creation
+- **Multiple event types**: Google Calendar events, Jira tasks, GitHub issues, or manual events
+- **Smart linking**: Link existing Jira issues to calendar events
+- **Type-specific metadata**: Each event type stores relevant information
+- **Cross-platform sync**: Changes sync across all connected platforms
+
+### 🎯 Tasks Management
+- **Expandable interface**: Click "Show Details" to see task information and available transitions
+- **Status management**: View current status and available workflow transitions
+- **Multi-account**: Manage tasks across all connected Jira accounts
+- **Real-time updates**: Changes reflect immediately in both UI and Jira
 
 ## 🛠️ Tech Stack
 
@@ -66,49 +89,62 @@ cally/
 - [x] Backend Express server setup
 - [x] Database schema design
 
-### Phase 2: Authentication & Authorization
+### Phase 2: Authentication & Authorization ✅
 - [x] Google OAuth 2.0 implementation
-- [ ] JWT token management
+- [x] JWT token management
 - [x] Protected API routes
-- [ ] User session handling
+- [x] User session handling
+- [x] Multi-account support
 
-### Phase 3: Google Calendar Integration
+### Phase 3: Google Calendar Integration ✅
 - [x] Google Calendar API setup
 - [x] Calendar event fetching
 - [x] FullCalendar.js implementation
 - [x] Calendar view UI
+- [x] Event creation and management
 
-### Phase 4: Jira Integration
-- [ ] Atlassian REST API integration
-- [ ] Issue fetching and mapping
-- [ ] Task display in sidebar
-- [ ] Jira OAuth setup
+### Phase 4: Jira Integration ✅
+- [x] Atlassian REST API integration
+- [x] Jira OAuth 2.0 setup
+- [x] Issue fetching and mapping
+- [x] Dynamic workflow transitions
+- [x] Task status management
+- [x] Multi-account Jira support
 
-### Phase 5: GitHub Integration
+### Phase 5: Unified Event System ✅
+- [x] Dynamic event creation system
+- [x] Event type management (Google Calendar, Jira, Manual)
+- [x] Cross-platform event linking
+- [x] Metadata storage and management
+- [x] Auto-color coding by event type
+
+### Phase 6: Advanced Task Management ✅
+- [x] Dedicated Tasks tab interface
+- [x] Expandable task details
+- [x] Real-time status transitions
+- [x] Project-specific workflow integration
+- [x] Permission-aware transition display
+
+### Phase 7: GitHub Integration 🔄
 - [ ] GitHub REST API integration
 - [ ] Issues and PR fetching
 - [ ] Commit activity tracking
 - [ ] GitHub OAuth setup
 
-### Phase 6: Task Assignment & UI
-- [ ] Drag-and-drop functionality
-- [ ] Task-to-calendar assignment logic
-- [ ] Database persistence
-- [ ] Color coding by source
+### Phase 8: Enhanced UI & UX 🔄
+- [x] Responsive design with Tailwind CSS
+- [ ] Advanced drag-and-drop functionality
+- [ ] Mobile-optimized interface
+- [ ] PWA support
 
-### Phase 7: Data Synchronization
+### Phase 9: Data Synchronization & Performance
+- [x] Real-time sync for Jira tasks
+- [x] Automatic status cleanup
 - [ ] Background sync jobs
 - [ ] Webhook implementations
 - [ ] Data consistency management
-- [ ] Error handling and retry logic
 
-### Phase 8: Mobile & Responsive Design
-- [ ] Tailwind responsive breakpoints
-- [ ] Touch-friendly drag and drop
-- [ ] Mobile-optimized UI
-- [ ] PWA support (optional)
-
-### Phase 9: Testing & Deployment
+### Phase 10: Testing & Deployment
 - [ ] Unit and integration tests
 - [ ] Cross-device testing
 - [ ] Production deployment

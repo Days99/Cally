@@ -194,7 +194,7 @@ const Dashboard = () => {
               <div>
                 <h4 className="font-medium text-green-900">Jira Integration</h4>
                 <p className="text-sm text-green-700">
-                  Phase 4: ✓ Connected & Active
+                  Phase 4-6: ✓ Connected & Active with Dynamic Transitions
                 </p>
               </div>
               <div className="text-green-600 text-2xl">📋</div>
@@ -360,7 +360,7 @@ const Dashboard = () => {
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Development Progress</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-green-50 border border-green-200 rounded-md p-4">
-            <h4 className="font-medium text-green-900 mb-2">✅ Completed (Phases 1-4)</h4>
+            <h4 className="font-medium text-green-900 mb-2">✅ Completed (Phases 1-6)</h4>
             <ul className="text-sm text-green-700 space-y-1">
               <li>• Google OAuth Authentication</li>
               <li>• Database Schema & Models</li>
@@ -368,32 +368,34 @@ const Dashboard = () => {
               <li>• Calendar UI with FullCalendar</li>
               <li>• Event Sync & Management</li>
               <li>• Multi-Account Support</li>
-              <li>• Account Management Dashboard</li>
               <li>• Jira OAuth Integration</li>
-              <li>• Task Fetching & Management</li>
-              <li>• Issue Status Updates</li>
+              <li>• Unified Event Creation System</li>
+              <li>• Dynamic Jira Workflow Transitions</li>
+              <li>• Task Management Interface</li>
+              <li>• Real-time Status Updates</li>
+              <li>• Auto-cleanup on Task Completion</li>
             </ul>
           </div>
           
           <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-            <h4 className="font-medium text-blue-900 mb-2">🔄 Phase 5: Unified Event Creation</h4>
+            <h4 className="font-medium text-blue-900 mb-2">🔄 Phase 7: GitHub Integration</h4>
             <ul className="text-sm text-blue-700 space-y-1">
-              <li>• Dynamic Event Modal</li>
-              <li>• Multi-Type Event Creation</li>
-              <li>• Database Schema Updates</li>
-              <li>• Calendar Integration Hub</li>
-              <li>• Event Type Detection</li>
+              <li>• GitHub OAuth Setup</li>
+              <li>• Issues & PR Fetching</li>
+              <li>• Commit Activity Tracking</li>
+              <li>• Repository Management</li>
+              <li>• GitHub Event Creation</li>
             </ul>
           </div>
           
           <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
             <h4 className="font-medium text-gray-900 mb-2">📋 Future Phases</h4>
             <ul className="text-sm text-gray-700 space-y-1">
-              <li>• GitHub Integration (Phase 6)</li>
-              <li>• Drag & Drop Interface (Phase 7)</li>
-              <li>• Advanced Filtering (Phase 8)</li>
-              <li>• Mobile Optimization (Phase 9)</li>
+              <li>• Enhanced UI & UX (Phase 8)</li>
+              <li>• Advanced Drag & Drop (Phase 9)</li>
               <li>• Performance Optimization (Phase 10)</li>
+              <li>• Mobile Optimization (Phase 11)</li>
+              <li>• Testing & Deployment (Phase 12)</li>
             </ul>
           </div>
         </div>
