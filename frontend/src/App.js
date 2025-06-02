@@ -12,6 +12,8 @@ import AuthCallback from './pages/AuthCallback';
 import Calendar from './pages/Calendar';
 import Tasks from './pages/Tasks';
 import Settings from './pages/Settings';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import TermsOfServicePage from './pages/TermsOfServicePage';
 
 // Import components
 import Navbar from './components/Navbar';
@@ -28,6 +30,8 @@ function App() {
             {/* Public routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/privacy" element={<PrivacyPolicyPage />} />
+            <Route path="/terms" element={<TermsOfServicePage />} />
             
             {/* Protected routes */}
             <Route path="/*" element={

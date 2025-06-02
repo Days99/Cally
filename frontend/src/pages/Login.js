@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import PrivacyPolicyModal from '../components/PrivacyPolicyModal';
 
 const Login = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const { login, authenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -15,7 +18,44 @@ const Login = () => {
     }
   }, [authenticated, navigate]);
 
+  // Check if user has previously accepted privacy policy
+  useEffect(() => {
+    const hasAcceptedPrivacy = localStorage.getItem('privacy_policy_accepted');
+    if (hasAcceptedPrivacy === 'true') {
+      setPrivacyAccepted(true);
+    }
+  }, []);
+
+  const handlePrivacyAccept = () => {
+    setPrivacyAccepted(true);
+    setShowPrivacyModal(false);
+    localStorage.setItem('privacy_policy_accepted', 'true');
+    localStorage.setItem('privacy_policy_date', new Date().toISOString());
+  };
+
+  const handlePrivacyDecline = () => {
+    setPrivacyAccepted(false);
+    setShowPrivacyModal(false);
+    localStorage.removeItem('privacy_policy_accepted');
+    localStorage.removeItem('privacy_policy_date');
+  };
+
+  const handlePrivacyToggle = (checked) => {
+    if (checked) {
+      setShowPrivacyModal(true);
+    } else {
+      setPrivacyAccepted(false);
+      localStorage.removeItem('privacy_policy_accepted');
+      localStorage.removeItem('privacy_policy_date');
+    }
+  };
+
   const handleGoogleLogin = async () => {
+    if (!privacyAccepted) {
+      setError('Please accept the Privacy Policy to continue');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -56,10 +96,53 @@ const Login = () => {
           </div>
         )}
 
+        {/* Privacy Policy Agreement */}
+        <div className="mb-6">
+          <div className="flex items-start">
+            <div className="flex items-center h-5">
+              <input
+                id="privacy-agreement"
+                name="privacy-agreement"
+                type="checkbox"
+                checked={privacyAccepted}
+                onChange={(e) => handlePrivacyToggle(e.target.checked)}
+                className="focus:ring-primary-500 h-4 w-4 text-primary-600 border-gray-300 rounded"
+              />
+            </div>
+            <div className="ml-3 text-sm">
+              <label htmlFor="privacy-agreement" className="text-gray-700">
+                I agree to the{' '}
+                <button
+                  type="button"
+                  onClick={() => setShowPrivacyModal(true)}
+                  className="text-primary-600 hover:text-primary-500 underline font-medium"
+                >
+                  Privacy Policy
+                </button>
+                {' '}and{' '}
+                <Link 
+                  to="/terms" 
+                  className="text-primary-600 hover:text-primary-500 underline font-medium"
+                >
+                  Terms of Service
+                </Link>
+                {' '}*
+              </label>
+            </div>
+          </div>
+          {!privacyAccepted && (
+            <p className="mt-2 text-xs text-gray-500">
+              You must accept our privacy policy to create an account and use Cally
+            </p>
+          )}
+        </div>
+
         <button 
           onClick={handleGoogleLogin}
-          disabled={loading}
-          className="w-full flex items-center justify-center px-4 py-3 border border-gray-300 rounded-md shadow-sm bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+          disabled={loading || !privacyAccepted}
+          className={`w-full flex items-center justify-center px-4 py-3 border border-gray-300 rounded-md shadow-sm bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200 ${
+            !privacyAccepted ? 'opacity-50 cursor-not-allowed' : 'disabled:opacity-50 disabled:cursor-not-allowed'
+          }`}
         >
           {loading ? (
             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600"></div>
@@ -78,14 +161,14 @@ const Login = () => {
 
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600">
-            By signing in, you agree to our{' '}
-            <a href="#" className="text-primary-600 hover:text-primary-500">
-              Terms of Service
-            </a>{' '}
-            and{' '}
-            <a href="#" className="text-primary-600 hover:text-primary-500">
+            Need help? Read our{' '}
+            <Link 
+              to="/privacy" 
+              className="text-primary-600 hover:text-primary-500 underline"
+            >
               Privacy Policy
-            </a>
+            </Link>
+            {' '}to learn how we protect your data.
           </p>
         </div>
 
@@ -116,6 +199,13 @@ const Login = () => {
             </ul>
           </div>
         </div>
+
+        {/* Privacy Policy Modal */}
+        <PrivacyPolicyModal
+          isOpen={showPrivacyModal}
+          onAccept={handlePrivacyAccept}
+          onDecline={handlePrivacyDecline}
+        />
       </div>
     </div>
   );
