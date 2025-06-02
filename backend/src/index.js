@@ -11,12 +11,15 @@ const PORT = process.env.PORT || 3001;
 const allowedOrigins = [
   process.env.FRONTEND_URL || 'http://localhost:3000',
   'http://localhost:3000', // For development
-  'http://localhost:3001'  // For development
+  'http://localhost:3001', // For development
+  'https://cally.pt',      // Production domain
+  'https://www.cally.pt',  // Production domain with www
+  'https://cally-frontend.vercel.app' // Vercel deployment (if different)
 ];
 
 // Add additional origins from environment variable if provided
 if (process.env.ALLOWED_ORIGINS) {
-  const additionalOrigins = process.env.ALLOWED_ORIGINS.split(',');
+  const additionalOrigins = process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim());
   allowedOrigins.push(...additionalOrigins);
 }
 
@@ -30,7 +33,11 @@ app.use(cors({
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      console.log('Blocked by CORS:', origin);
+      console.log('❌ Blocked by CORS:', origin);
+      console.log('🔧 Allowed origins:', allowedOrigins);
+      console.log('🌍 Environment variables:');
+      console.log('   FRONTEND_URL:', process.env.FRONTEND_URL);
+      console.log('   ALLOWED_ORIGINS:', process.env.ALLOWED_ORIGINS);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -59,6 +66,7 @@ app.use('/api/events', require('./routes/events'));
 app.use('/api/jira', require('./routes/jira'));
 app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/integrations', require('./routes/integrations'));
+app.use('/api/contact', require('./routes/contact'));
 
 // 404 handler
 app.use('*', (req, res) => {
