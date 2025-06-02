@@ -14,6 +14,7 @@ import Tasks from './pages/Tasks';
 import Settings from './pages/Settings';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import TermsOfServicePage from './pages/TermsOfServicePage';
+import ContactPage from './pages/ContactPage';
 
 // Import components
 import Navbar from './components/Navbar';
@@ -32,6 +33,7 @@ function App() {
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/privacy" element={<PrivacyPolicyPage />} />
             <Route path="/terms" element={<TermsOfServicePage />} />
+            <Route path="/contact" element={<ContactPage />} />
             
             {/* Protected routes */}
             <Route path="/*" element={

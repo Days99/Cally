@@ -110,7 +110,7 @@ const PrivacyPolicy = ({ isModal = false }) => {
             <li><strong>Withdrawal:</strong> Withdraw consent at any time</li>
           </ul>
           <p className="text-gray-700 mt-4">
-            To exercise these rights, contact us at privacy@cally.app or through your account settings.
+            To exercise these rights, contact us at privacy@cally.pt or through your account settings.
           </p>
         </section>
 
@@ -156,9 +156,10 @@ const PrivacyPolicy = ({ isModal = false }) => {
           </p>
           <div className="bg-gray-50 p-4 rounded-lg">
             <p className="text-gray-700">
-              <strong>Email:</strong> privacy@cally.app<br/>
-              <strong>Address:</strong> [Your Company Address]<br/>
-              <strong>Phone:</strong> [Your Contact Number]
+              <strong>Email:</strong> support@cally.pt<br/>
+              <strong>Privacy Email:</strong> privacy@cally.pt<br/>
+              <strong>Contact Form:</strong> <a href="/contact" className="text-blue-600 hover:text-blue-800">cally.pt/contact</a><br/>
+              <strong>Website:</strong> https://cally.pt
             </p>
           </div>
         </section>

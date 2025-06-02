@@ -108,8 +108,9 @@ const TermsOfService = ({ isModal = false }) => {
           </p>
           <div className="bg-gray-50 p-4 rounded-lg">
             <p className="text-gray-700">
-              <strong>Email:</strong> support@cally.app<br/>
-              <strong>Website:</strong> https://cally.app
+              <strong>Email:</strong> support@cally.pt<br/>
+              <strong>Website:</strong> https://cally.pt<br/>
+              <strong>Contact Form:</strong> <a href="/contact" className="text-blue-600 hover:text-blue-800">cally.pt/contact</a>
             </p>
           </div>
         </section>
