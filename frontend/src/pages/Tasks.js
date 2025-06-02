@@ -8,9 +8,13 @@ import {
   ClockIcon,
   PlayIcon,
   ChevronDownIcon,
-  ChevronUpIcon
+  ChevronUpIcon,
+  PlusIcon,
+  XMarkIcon,
+  CalendarIcon
 } from '@heroicons/react/24/outline';
 import accountService from '../services/accountService';
+import eventService from '../services/eventService';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -25,9 +29,54 @@ const Tasks = () => {
   const [loadingTransitions, setLoadingTransitions] = useState({});
   const [updatingStatus, setUpdatingStatus] = useState({});
 
+  // New issue creation state
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [accounts, setAccounts] = useState([]);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState(null);
+  const [newIssueForm, setNewIssueForm] = useState({
+    accountId: '',
+    projectKey: '',
+    summary: '',
+    description: '',
+    issueType: '',
+    priority: '',
+    assignee: '',
+    // Calendar event fields
+    createCalendarEvent: false,
+    eventTitle: '',
+    eventDate: '',
+    eventStartTime: '',
+    eventEndTime: '',
+    eventLocation: ''
+  });
+
+  // Projects state for the selected account
+  const [projects, setProjects] = useState([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+
+  // Project metadata state (issue types, priorities, assignees)
+  const [projectMetadata, setProjectMetadata] = useState({
+    issueTypes: [],
+    priorities: [],
+    assignableUsers: []
+  });
+  const [loadingMetadata, setLoadingMetadata] = useState(false);
+
   useEffect(() => {
     fetchIssues();
+    loadAccounts();
   }, []);
+
+  const loadAccounts = async () => {
+    try {
+      const accountsData = await accountService.getAccounts();
+      setAccounts(Array.isArray(accountsData) ? accountsData.filter(acc => acc.provider === 'jira') : []);
+    } catch (error) {
+      console.error('Failed to load accounts:', error);
+      setAccounts([]);
+    }
+  };
 
   const fetchIssues = async () => {
     try {
@@ -127,7 +176,7 @@ const Tasks = () => {
               status: {
                 ...i.fields.status,
                 name: newStatusName,
-                statusCategory: selectedTransition?.to?.statusCategory || i.fields.status?.statusCategory
+                statusCategory: selectedTransition?.to?.statusCategory
               }
             }
           };
@@ -210,6 +259,396 @@ const Tasks = () => {
     }
   });
 
+  const handleCreateNewIssue = async () => {
+    if (!newIssueForm.accountId || !newIssueForm.projectKey || !newIssueForm.summary) {
+      setCreateError('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      setCreating(true);
+      setCreateError(null);
+
+      console.log('Creating new Jira issue with form data:', newIssueForm);
+      console.log('Project metadata:', projectMetadata);
+
+      // Helper function to check if a value has meaningful content
+      const hasContent = (value) => value && typeof value === 'string' && value.trim().length > 0;
+
+      // Create the Jira issue - only include fields that have meaningful content
+      const issueData = {
+        accountId: newIssueForm.accountId,
+        projectKey: newIssueForm.projectKey,
+        summary: newIssueForm.summary,
+      };
+
+      // Only add optional fields if they have meaningful content
+      if (hasContent(newIssueForm.description)) {
+        issueData.description = newIssueForm.description;
+      }
+
+      if (hasContent(newIssueForm.issueType)) {
+        issueData.issueType = newIssueForm.issueType;
+      }
+
+      if (hasContent(newIssueForm.priority)) {
+        issueData.priority = newIssueForm.priority;
+      }
+
+      if (hasContent(newIssueForm.assignee)) {
+        issueData.assignee = newIssueForm.assignee;
+      }
+
+      console.log('Issue data being sent to backend:', issueData);
+
+      const createdIssue = await accountService.createJiraIssue(issueData);
+      console.log('Created Jira issue:', createdIssue);
+
+      // If user wants to create a calendar event, create it and link to the issue
+      if (newIssueForm.createCalendarEvent && newIssueForm.eventDate) {
+        const eventData = {
+          eventType: 'jira_task',
+          title: newIssueForm.eventTitle || newIssueForm.summary,
+          description: `Jira Issue: ${createdIssue.key}\n\n${newIssueForm.description}`,
+          isAllDay: false,
+          accountId: newIssueForm.accountId,
+          metadata: {
+            associationType: 'existing',
+            existingIssueKey: createdIssue.key,
+            linkExisting: true,
+            jiraKey: createdIssue.key,
+            project: newIssueForm.projectKey,
+            issueType: newIssueForm.issueType
+          }
+        };
+
+        // Add date - always required for calendar events
+        eventData.eventDate = newIssueForm.eventDate;
+
+        // Only add time fields if they have meaningful content
+        if (hasContent(newIssueForm.eventStartTime)) {
+          eventData.startTime = `${newIssueForm.eventDate}T${newIssueForm.eventStartTime}`;
+        }
+
+        if (hasContent(newIssueForm.eventEndTime)) {
+          eventData.endTime = `${newIssueForm.eventDate}T${newIssueForm.eventEndTime}`;
+        }
+
+        // Only add optional fields if they have meaningful content
+        if (hasContent(newIssueForm.eventLocation)) {
+          eventData.location = newIssueForm.eventLocation;
+        }
+
+        // Only add priority if the Jira issue has a priority
+        if (hasContent(newIssueForm.priority)) {
+          eventData.priority = newIssueForm.priority.toLowerCase();
+        }
+
+        console.log('Creating calendar event for issue:', eventData);
+        await eventService.createEvent(eventData);
+        console.log('Created calendar event for issue');
+      }
+
+      // Refresh the issues list
+      await fetchIssues();
+      
+      // Reset form and close modal
+      setNewIssueForm({
+        accountId: '',
+        projectKey: '',
+        summary: '',
+        description: '',
+        issueType: '',
+        priority: '',
+        assignee: '',
+        createCalendarEvent: false,
+        eventTitle: '',
+        eventDate: '',
+        eventStartTime: '',
+        eventEndTime: '',
+        eventLocation: ''
+      });
+      setProjects([]);
+      setProjectMetadata({
+        issueTypes: [],
+        priorities: [],
+        assignableUsers: []
+      });
+      setCreateError(null);
+      setShowCreateModal(false);
+
+      console.log('Successfully created new issue with optional calendar event');
+
+    } catch (error) {
+      console.error('Error creating issue:', error);
+      setCreateError(error.message || 'Failed to create issue');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleFormChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    
+    // Handle account change - load projects and reset project selection
+    if (name === 'accountId') {
+      setNewIssueForm(prev => ({
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value,
+        projectKey: '' // Reset project when account changes
+      }));
+      
+      // Load projects for the selected account
+      if (value) {
+        loadProjects(value);
+      } else {
+        setProjects([]);
+      }
+      return;
+    }
+
+    // Handle project change - load metadata and reset dependent fields
+    if (name === 'projectKey') {
+      setNewIssueForm(prev => ({
+        ...prev,
+        [name]: value,
+        issueType: '', // Reset issue type when project changes
+        priority: '', // Reset priority when project changes
+        assignee: '' // Reset assignee when project changes
+      }));
+      
+      // Load metadata for the selected project
+      if (value && newIssueForm.accountId) {
+        loadProjectMetadata(newIssueForm.accountId, value);
+      } else {
+        setProjectMetadata({
+          issueTypes: [],
+          priorities: [],
+          assignableUsers: []
+        });
+      }
+      return;
+    }
+
+    // Handle calendar event checkbox - set smart defaults when enabled or clear when disabled
+    if (name === 'createCalendarEvent') {
+      if (checked) {
+        const now = new Date();
+        const nextHour = getNextAvailableHour(now);
+        const defaultEndTime = new Date(nextHour.getTime() + 60 * 60 * 1000); // 1 hour later
+        
+        setNewIssueForm(prev => ({
+          ...prev,
+          [name]: checked,
+          eventDate: nextHour.toISOString().split('T')[0], // YYYY-MM-DD format
+          eventStartTime: nextHour.toTimeString().slice(0, 5), // HH:MM format
+          eventEndTime: defaultEndTime.toTimeString().slice(0, 5), // HH:MM format
+          eventTitle: prev.summary || '' // Use current summary as default title
+        }));
+      } else {
+        // Clear calendar event fields when unchecked
+        setNewIssueForm(prev => ({
+          ...prev,
+          [name]: checked,
+          eventDate: '',
+          eventStartTime: '',
+          eventEndTime: '',
+          eventTitle: '',
+          eventLocation: ''
+        }));
+      }
+      return;
+    }
+
+    setNewIssueForm(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+
+    // Auto-populate event title when summary changes (handles both cases)
+    if (name === 'summary') {
+      // If calendar event is enabled, update if empty or matches previous summary
+      // If calendar event is disabled, only update if empty (for future use)
+      const shouldUpdate = newIssueForm.createCalendarEvent 
+        ? (!newIssueForm.eventTitle || newIssueForm.eventTitle === newIssueForm.summary)
+        : !newIssueForm.eventTitle;
+        
+      if (shouldUpdate) {
+        setNewIssueForm(prev => ({
+          ...prev,
+          eventTitle: value
+        }));
+      }
+    }
+  };
+
+  const loadProjectMetadata = async (accountId, projectKey) => {
+    if (!accountId || !projectKey) {
+      setProjectMetadata({
+        issueTypes: [],
+        priorities: [],
+        assignableUsers: []
+      });
+      return;
+    }
+
+    try {
+      setLoadingMetadata(true);
+      setCreateError(null);
+      const metadata = await accountService.getJiraProjectMetadata(accountId, projectKey);
+      setProjectMetadata(metadata);
+      
+      // Helper function to check if a value has meaningful content
+      const hasContent = (value) => value && typeof value === 'string' && value.trim().length > 0;
+      
+      // Always update form fields based on metadata availability
+      const updates = {};
+      
+      if (metadata.issueTypes.length > 0) {
+        // Check if current value is valid for this project
+        const isValidIssueType = metadata.issueTypes.some(it => it.name === newIssueForm.issueType);
+        if (!isValidIssueType) {
+          // Set first available issue type (no hardcoded defaults)
+          updates.issueType = metadata.issueTypes[0].name;
+        }
+      } else {
+        // Always clear if not available
+        updates.issueType = '';
+      }
+      
+      if (metadata.priorities.length > 0) {
+        // Check if current value is valid for this project
+        const isValidPriority = metadata.priorities.some(p => p.name === newIssueForm.priority);
+        if (!isValidPriority) {
+          // Set middle priority or first available (no hardcoded defaults)
+          const middleIndex = Math.floor(metadata.priorities.length / 2);
+          updates.priority = metadata.priorities[middleIndex].name;
+        }
+      } else {
+        // Always clear if not available
+        updates.priority = '';
+      }
+      
+      if (metadata.assignableUsers.length > 0) {
+        // Keep existing assignee if it's valid, otherwise clear
+        const isValidAssignee = hasContent(newIssueForm.assignee) && metadata.assignableUsers.some(user => 
+          user.emailAddress === newIssueForm.assignee || user.accountId === newIssueForm.assignee
+        );
+        if (!isValidAssignee) {
+          updates.assignee = '';
+        }
+      } else {
+        // Always clear if not available
+        updates.assignee = '';
+      }
+      
+      // Apply all updates at once
+      if (Object.keys(updates).length > 0) {
+        setNewIssueForm(prev => ({ ...prev, ...updates }));
+      }
+      
+    } catch (error) {
+      console.error('Failed to load project metadata:', error);
+      setCreateError(`Failed to load project metadata: ${error.message}`);
+      setProjectMetadata({
+        issueTypes: [],
+        priorities: [],
+        assignableUsers: []
+      });
+      // Clear all fields when metadata loading fails
+      setNewIssueForm(prev => ({ 
+        ...prev, 
+        issueType: '', 
+        priority: '', 
+        assignee: '' 
+      }));
+    } finally {
+      setLoadingMetadata(false);
+    }
+  };
+
+  // Calculate the next available hour for smart scheduling
+  const getNextAvailableHour = (currentDate) => {
+    const nextHour = new Date(currentDate);
+    
+    // Round up to the next hour
+    nextHour.setMinutes(0, 0, 0); // Reset minutes, seconds, milliseconds
+    nextHour.setHours(nextHour.getHours() + 1);
+    
+    // Check if it's weekend (Saturday = 6, Sunday = 0)
+    const dayOfWeek = nextHour.getDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      // Schedule for next Monday at 9 AM
+      const daysUntilMonday = dayOfWeek === 0 ? 1 : 2; // Sunday = 1 day, Saturday = 2 days
+      nextHour.setDate(nextHour.getDate() + daysUntilMonday);
+      nextHour.setHours(9, 0, 0, 0);
+      return nextHour;
+    }
+    
+    // If it's late evening (after 6 PM) or early morning (before 8 AM), 
+    // schedule for next business day at 9 AM
+    const hour = nextHour.getHours();
+    if (hour >= 18 || hour < 8) {
+      // Set to next day at 9 AM if current time is outside business hours
+      const tomorrow = new Date(nextHour);
+      if (hour >= 18) {
+        tomorrow.setDate(tomorrow.getDate() + 1);
+      }
+      tomorrow.setHours(9, 0, 0, 0);
+      
+      // Check if tomorrow is weekend and adjust accordingly
+      const tomorrowDayOfWeek = tomorrow.getDay();
+      if (tomorrowDayOfWeek === 0 || tomorrowDayOfWeek === 6) {
+        const daysUntilMonday = tomorrowDayOfWeek === 0 ? 1 : 2;
+        tomorrow.setDate(tomorrow.getDate() + daysUntilMonday);
+      }
+      
+      return tomorrow;
+    }
+    
+    return nextHour;
+  };
+
+  const loadProjects = async (accountId) => {
+    if (!accountId) {
+      setProjects([]);
+      return;
+    }
+
+    try {
+      setLoadingProjects(true);
+      setCreateError(null);
+      const projectsData = await accountService.getJiraProjects(accountId);
+      setProjects(projectsData || []);
+    } catch (error) {
+      console.error('Failed to load projects:', error);
+      setCreateError(`Failed to load projects: ${error.message}`);
+      setProjects([]);
+    } finally {
+      setLoadingProjects(false);
+    }
+  };
+
+  // Check if the form is valid for submission
+  const isFormValid = () => {
+    // Basic required fields
+    if (!newIssueForm.accountId || !newIssueForm.projectKey || !newIssueForm.summary) {
+      return false;
+    }
+
+    // If issue types are available and none is selected, form is invalid
+    if (projectMetadata.issueTypes.length > 0 && !newIssueForm.issueType) {
+      return false;
+    }
+
+    // If calendar event is enabled, require event date
+    if (newIssueForm.createCalendarEvent && !newIssueForm.eventDate) {
+      return false;
+    }
+
+    return true;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -230,14 +669,24 @@ const Tasks = () => {
             </p>
           </div>
           
-          <button
-            onClick={syncIssues}
-            disabled={syncing}
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-          >
-            <ArrowPathIcon className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-            {syncing ? 'Syncing...' : 'Sync Issues'}
-          </button>
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+            >
+              <PlusIcon className="h-4 w-4 mr-2" />
+              Create New Issue
+            </button>
+            
+            <button
+              onClick={syncIssues}
+              disabled={syncing}
+              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+            >
+              <ArrowPathIcon className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Syncing...' : 'Sync Issues'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -508,6 +957,347 @@ const Tasks = () => {
                 )}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Create New Issue Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center space-x-3">
+                <span className="text-2xl">📋</span>
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900">Create New Jira Issue</h2>
+                  <p className="text-sm text-gray-600">Create a new issue with optional calendar event</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setProjects([]);
+                  setProjectMetadata({
+                    issueTypes: [],
+                    priorities: [],
+                    assignableUsers: []
+                  });
+                  setCreateError(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <XMarkIcon className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6">
+              {createError && (
+                <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-4">
+                  <p className="text-sm text-red-800">{createError}</p>
+                </div>
+              )}
+
+              <div className="space-y-6">
+                {/* Account Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Jira Account *
+                  </label>
+                  <select
+                    name="accountId"
+                    value={newIssueForm.accountId}
+                    onChange={handleFormChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                    required
+                  >
+                    <option value="">Select an account...</option>
+                    {accounts.map(account => (
+                      <option key={account.id} value={account.id}>
+                        {account.accountName} ({account.accountEmail})
+                        {account.isPrimary && ' ★'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Issue Details */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Project Key *
+                    </label>
+                    <select
+                      name="projectKey"
+                      value={newIssueForm.projectKey}
+                      onChange={handleFormChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                      required
+                      disabled={!newIssueForm.accountId || loadingProjects}
+                    >
+                      <option value="">
+                        {!newIssueForm.accountId 
+                          ? "Select an account first..." 
+                          : loadingProjects 
+                            ? "Loading projects..." 
+                            : "Select a project..."
+                        }
+                      </option>
+                      {projects.map(project => (
+                        <option key={project.id} value={project.key}>
+                          {project.name} ({project.key})
+                        </option>
+                      ))}
+                    </select>
+                    {loadingProjects && (
+                      <div className="mt-1 flex items-center text-sm text-blue-600">
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-1"></div>
+                        Loading available projects...
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Dynamic Issue Type - only show if data is available */}
+                  {projectMetadata.issueTypes.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Issue Type *
+                      </label>
+                      <select
+                        name="issueType"
+                        value={newIssueForm.issueType}
+                        onChange={handleFormChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                        disabled={loadingMetadata}
+                        required
+                      >
+                        <option value="">
+                          {loadingMetadata ? "Loading issue types..." : "Select issue type..."}
+                        </option>
+                        {projectMetadata.issueTypes.map(issueType => (
+                          <option key={issueType.id} value={issueType.name}>
+                            {issueType.name}
+                          </option>
+                        ))}
+                      </select>
+                      {loadingMetadata && (
+                        <div className="mt-1 flex items-center text-sm text-blue-600">
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-1"></div>
+                          Loading project configuration...
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Summary *
+                  </label>
+                  <input
+                    type="text"
+                    name="summary"
+                    value={newIssueForm.summary}
+                    onChange={handleFormChange}
+                    placeholder="Brief description of the issue"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Description
+                  </label>
+                  <textarea
+                    name="description"
+                    value={newIssueForm.description}
+                    onChange={handleFormChange}
+                    rows={3}
+                    placeholder="Detailed description of the issue"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+
+                {/* Dynamic Priority and Assignee Grid - only show sections with data */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Dynamic Priority - only show if data is available */}
+                  {projectMetadata.priorities.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Priority
+                      </label>
+                      <select
+                        name="priority"
+                        value={newIssueForm.priority}
+                        onChange={handleFormChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                        disabled={loadingMetadata}
+                      >
+                        <option value="">
+                          {loadingMetadata ? "Loading priorities..." : "Select priority..."}
+                        </option>
+                        {projectMetadata.priorities.map(priority => (
+                          <option key={priority.id} value={priority.name}>
+                            {priority.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Dynamic Assignee - only show if data is available */}
+                  {projectMetadata.assignableUsers.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Assignee
+                      </label>
+                      <select
+                        name="assignee"
+                        value={newIssueForm.assignee}
+                        onChange={handleFormChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                        disabled={loadingMetadata}
+                      >
+                        <option value="">Unassigned</option>
+                        {projectMetadata.assignableUsers.map(user => (
+                          <option key={user.accountId} value={user.emailAddress || user.accountId}>
+                            {user.displayName} ({user.emailAddress})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                {/* Calendar Event Section */}
+                <div className="border-t border-gray-200 pt-6">
+                  <div className="flex items-center mb-4">
+                    <input
+                      type="checkbox"
+                      name="createCalendarEvent"
+                      checked={newIssueForm.createCalendarEvent}
+                      onChange={handleFormChange}
+                      className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                    />
+                    <label className="ml-2 text-sm font-medium text-gray-900 flex items-center">
+                      <CalendarIcon className="h-4 w-4 mr-1" />
+                      Create associated calendar event
+                    </label>
+                  </div>
+
+                  {newIssueForm.createCalendarEvent && (
+                    <div className="space-y-4 pl-6 border-l-2 border-green-200">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Event Title
+                        </label>
+                        <input
+                          type="text"
+                          name="eventTitle"
+                          value={newIssueForm.eventTitle}
+                          onChange={handleFormChange}
+                          placeholder="Will use issue summary if empty"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Event Date *
+                        </label>
+                        <input
+                          type="date"
+                          name="eventDate"
+                          value={newIssueForm.eventDate}
+                          onChange={handleFormChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                          required
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Start Time
+                          </label>
+                          <input
+                            type="time"
+                            name="eventStartTime"
+                            value={newIssueForm.eventStartTime}
+                            onChange={handleFormChange}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            End Time
+                          </label>
+                          <input
+                            type="time"
+                            name="eventEndTime"
+                            value={newIssueForm.eventEndTime}
+                            onChange={handleFormChange}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Location
+                        </label>
+                        <input
+                          type="text"
+                          name="eventLocation"
+                          value={newIssueForm.eventLocation}
+                          onChange={handleFormChange}
+                          placeholder="Meeting room, URL, etc."
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end p-6 border-t border-gray-200 bg-gray-50">
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setProjects([]);
+                    setProjectMetadata({
+                      issueTypes: [],
+                      priorities: [],
+                      assignableUsers: []
+                    });
+                    setCreateError(null);
+                  }}
+                  disabled={creating}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateNewIssue}
+                  disabled={creating || !isFormValid()}
+                  className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+                >
+                  {creating ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2 inline-block"></div>
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Issue'
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

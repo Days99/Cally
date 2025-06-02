@@ -42,7 +42,7 @@ const Task = sequelize.define('Task', {
   },
   priority: {
     type: DataTypes.ENUM('lowest', 'low', 'medium', 'high', 'highest'),
-    defaultValue: 'medium'
+    allowNull: true
   },
   assignee: {
     type: DataTypes.STRING,

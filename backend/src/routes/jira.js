@@ -23,7 +23,12 @@ router.get('/health/:accountId', jiraController.checkHealth);
 // Issue management routes
 router.get('/issues', jiraController.getAllIssues);
 router.get('/issues/:accountId', jiraController.getIssues);
+router.post('/issues', jiraController.createIssue);
 router.put('/issues/:accountId/:issueKey/status', jiraController.updateIssueStatus);
 router.get('/issues/:accountId/:issueKey/transitions', jiraController.getIssueTransitions);
+
+// Project management routes
+router.get('/projects/:accountId', jiraController.getProjects);
+router.get('/projects/:accountId/:projectKey/metadata', jiraController.getProjectMetadata);
 
 module.exports = router; 

@@ -160,6 +160,45 @@ class AccountService {
       throw new Error(error.response?.data?.message || 'Failed to update Jira issue status');
     }
   }
+
+  // Create a new Jira issue
+  async createJiraIssue(issueData) {
+    try {
+      console.log('🔍 DEBUG: accountService.createJiraIssue() - Making API call to:', `${API_URL}/api/jira/issues`, 'with data:', issueData);
+      const response = await axios.post(`${API_URL}/api/jira/issues`, issueData);
+      console.log('🔍 DEBUG: accountService.createJiraIssue() - Response:', response.data);
+      return response.data.issue;
+    } catch (error) {
+      console.error('🔍 DEBUG: accountService.createJiraIssue() - Error:', error);
+      throw new Error(error.response?.data?.message || 'Failed to create Jira issue');
+    }
+  }
+
+  // Get available projects for a Jira account
+  async getJiraProjects(accountId) {
+    try {
+      console.log('🔍 DEBUG: accountService.getJiraProjects() - Making API call to:', `${API_URL}/api/jira/projects/${accountId}`);
+      const response = await axios.get(`${API_URL}/api/jira/projects/${accountId}`);
+      console.log('🔍 DEBUG: accountService.getJiraProjects() - Response:', response.data);
+      return response.data.projects;
+    } catch (error) {
+      console.error('🔍 DEBUG: accountService.getJiraProjects() - Error:', error);
+      throw new Error(error.response?.data?.message || 'Failed to fetch Jira projects');
+    }
+  }
+
+  // Get project metadata (issue types, priorities, assignable users)
+  async getJiraProjectMetadata(accountId, projectKey) {
+    try {
+      console.log('🔍 DEBUG: accountService.getJiraProjectMetadata() - Making API call to:', `${API_URL}/api/jira/projects/${accountId}/${projectKey}/metadata`);
+      const response = await axios.get(`${API_URL}/api/jira/projects/${accountId}/${projectKey}/metadata`);
+      console.log('🔍 DEBUG: accountService.getJiraProjectMetadata() - Response:', response.data);
+      return response.data.metadata;
+    } catch (error) {
+      console.error('🔍 DEBUG: accountService.getJiraProjectMetadata() - Error:', error);
+      throw new Error(error.response?.data?.message || 'Failed to fetch project metadata');
+    }
+  }
 }
 
 const accountService = new AccountService();

@@ -251,6 +251,154 @@ class JiraController {
     }
   }
 
+  // Get projects for a specific Jira account
+  async getProjects(req, res) {
+    try {
+      const userId = req.user.id;
+      const { accountId } = req.params;
+
+      if (!accountId) {
+        return res.status(400).json({
+          error: 'Missing account ID',
+          message: 'Account ID is required'
+        });
+      }
+
+      const projects = await jiraService.getProjects(userId, accountId);
+
+      res.json({
+        success: true,
+        projects: projects,
+        message: 'Projects fetched successfully'
+      });
+    } catch (error) {
+      console.error('Error fetching Jira projects:', error);
+      
+      // Handle authentication errors with specific status codes
+      if (error.message.includes('Please reconnect') || error.message.includes('Authentication failed')) {
+        return res.status(401).json({
+          error: 'Authentication required',
+          message: error.message,
+          requiresReconnection: true
+        });
+      }
+      
+      if (error.message.includes('Insufficient permissions')) {
+        return res.status(403).json({
+          error: 'Insufficient permissions',
+          message: error.message
+        });
+      }
+      
+      res.status(500).json({
+        error: 'Failed to fetch projects',
+        message: error.message
+      });
+    }
+  }
+
+  // Get project metadata (issue types, priorities, assignable users)
+  async getProjectMetadata(req, res) {
+    try {
+      const userId = req.user.id;
+      const { accountId, projectKey } = req.params;
+
+      if (!accountId || !projectKey) {
+        return res.status(400).json({
+          error: 'Missing required parameters',
+          message: 'Account ID and project key are required'
+        });
+      }
+
+      const metadata = await jiraService.getProjectMetadata(userId, accountId, projectKey);
+
+      res.json({
+        success: true,
+        metadata: metadata,
+        message: 'Project metadata fetched successfully'
+      });
+    } catch (error) {
+      console.error('Error fetching project metadata:', error);
+      
+      // Handle authentication errors with specific status codes
+      if (error.message.includes('Please reconnect') || error.message.includes('Authentication failed')) {
+        return res.status(401).json({
+          error: 'Authentication required',
+          message: error.message,
+          requiresReconnection: true
+        });
+      }
+      
+      if (error.message.includes('Insufficient permissions')) {
+        return res.status(403).json({
+          error: 'Insufficient permissions',
+          message: error.message
+        });
+      }
+      
+      if (error.message.includes('Project not found')) {
+        return res.status(404).json({
+          error: 'Project not found',
+          message: error.message
+        });
+      }
+      
+      res.status(500).json({
+        error: 'Failed to fetch project metadata',
+        message: error.message
+      });
+    }
+  }
+
+  // Create a new Jira issue
+  async createIssue(req, res) {
+    try {
+      const userId = req.user.id;
+      const { 
+        accountId, 
+        projectKey, 
+        summary, 
+        description, 
+        issueType, 
+        priority, 
+        assignee 
+      } = req.body;
+
+      // Validate required fields
+      if (!accountId || !projectKey || !summary) {
+        return res.status(400).json({
+          error: 'Missing required fields',
+          message: 'accountId, projectKey, and summary are required'
+        });
+      }
+
+      // Create the issue
+      const issueData = {
+        projectKey,
+        summary,
+        description,
+        issueType: issueType,
+        priority: priority,
+        assignee
+      };
+
+      console.log('Creating Jira issue:', issueData);
+      const createdIssue = await jiraService.createIssue(userId, accountId, issueData);
+
+      res.json({
+        success: true,
+        issue: createdIssue,
+        message: 'Issue created successfully'
+      });
+    } catch (error) {
+      console.error('Error creating Jira issue:', error);
+      res.status(500).json({
+        error: 'Failed to create issue',
+        message: error.message
+      });
+    }
+  }
+
   // Get Jira workflow preferences
   async getWorkflowPreferences(req, res) {
     try {

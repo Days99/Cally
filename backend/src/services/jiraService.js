@@ -513,6 +513,211 @@ class JiraService {
     }
   }
 
+  // Get available projects that the user can create issues in
+  async getProjects(userId, accountId) {
+    try {
+      const accessToken = await this.getValidAccessToken(userId, accountId);
+      
+      const account = await Token.findOne({ 
+        where: { 
+          id: accountId,
+          userId, 
+          provider: 'jira', 
+          isActive: true 
+        } 
+      });
+      
+      if (!account || !account.metadata?.cloudId) {
+        throw new Error('Jira account not found or missing cloud ID');
+      }
+
+      const { cloudId } = account.metadata;
+
+      console.log('Fetching projects for Jira account:', accountId);
+
+      const response = await axios.get(
+        `https://api.atlassian.com/ex/jira/${cloudId}/rest/api/3/project/search`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json'
+          },
+          params: {
+            // Only get projects where user has CREATE_ISSUES permission
+            action: 'create',
+            maxResults: 50,
+            expand: 'description,lead,url'
+          }
+        }
+      );
+
+      console.log('Fetched projects:', response.data);
+
+      // Format projects for frontend use
+      const projects = response.data.values.map(project => ({
+        id: project.id,
+        key: project.key,
+        name: project.name,
+        description: project.description,
+        projectTypeKey: project.projectTypeKey,
+        lead: project.lead?.displayName,
+        url: project.self
+      }));
+
+      return projects;
+
+    } catch (error) {
+      console.error('Error fetching Jira projects:', error.response?.data || error.message);
+      
+      // Handle specific Jira API errors
+      if (error.response?.status === 401) {
+        throw new Error('Authentication failed. Please reconnect your Jira account.');
+      }
+      
+      if (error.response?.status === 403) {
+        throw new Error('Insufficient permissions to view projects');
+      }
+      
+      throw new Error('Failed to fetch Jira projects');
+    }
+  }
+
+  // Get project metadata (issue types, priorities, assignable users)
+  async getProjectMetadata(userId, accountId, projectKey) {
+    try {
+      const accessToken = await this.getValidAccessToken(userId, accountId);
+      
+      const account = await Token.findOne({ 
+        where: { 
+          id: accountId,
+          userId, 
+          provider: 'jira', 
+          isActive: true 
+        } 
+      });
+      
+      if (!account || !account.metadata?.cloudId) {
+        throw new Error('Jira account not found or missing cloud ID');
+      }
+
+      const { cloudId } = account.metadata;
+
+      console.log('Fetching project metadata for:', projectKey);
+
+      // Fetch project details with issue types
+      const projectResponse = await axios.get(
+        `https://api.atlassian.com/ex/jira/${cloudId}/rest/api/3/project/${projectKey}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json'
+          },
+          params: {
+            expand: 'issueTypes'
+          }
+        }
+      );
+
+      // Fetch create metadata for the project (this gives us available fields and their options)
+      const createMetaResponse = await axios.get(
+        `https://api.atlassian.com/ex/jira/${cloudId}/rest/api/3/issue/createmeta`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json'
+          },
+          params: {
+            projectKeys: projectKey,
+            expand: 'projects.issuetypes.fields'
+          }
+        }
+      );
+
+      // Fetch assignable users for the project
+      const assignableUsersResponse = await axios.get(
+        `https://api.atlassian.com/ex/jira/${cloudId}/rest/api/3/user/assignable/search`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json'
+          },
+          params: {
+            project: projectKey,
+            maxResults: 50
+          }
+        }
+      );
+
+      const projectData = createMetaResponse.data.projects[0];
+      if (!projectData) {
+        throw new Error('Project metadata not found');
+      }
+
+      // Extract issue types and their fields
+      const issueTypes = projectData.issuetypes.map(issueType => ({
+        id: issueType.id,
+        name: issueType.name,
+        description: issueType.description,
+        iconUrl: issueType.iconUrl,
+        subtask: issueType.subtask
+      }));
+
+      // Extract priorities from the first issue type (usually consistent across issue types)
+      const firstIssueType = projectData.issuetypes[0];
+      const priorityField = firstIssueType?.fields?.priority;
+      const priorities = priorityField?.allowedValues?.map(priority => ({
+        id: priority.id,
+        name: priority.name,
+        description: priority.description,
+        iconUrl: priority.iconUrl
+      })) || [];
+
+      // Format assignable users
+      const assignableUsers = assignableUsersResponse.data.map(user => ({
+        accountId: user.accountId,
+        emailAddress: user.emailAddress,
+        displayName: user.displayName,
+        avatarUrls: user.avatarUrls,
+        active: user.active
+      })).filter(user => user.active); // Only active users
+
+      console.log('Project metadata fetched successfully:', {
+        issueTypes: issueTypes.length,
+        priorities: priorities.length,
+        assignableUsers: assignableUsers.length
+      });
+
+      return {
+        project: {
+          id: projectData.id,
+          key: projectData.key,
+          name: projectData.name
+        },
+        issueTypes,
+        priorities,
+        assignableUsers
+      };
+
+    } catch (error) {
+      console.error('Error fetching project metadata:', error.response?.data || error.message);
+      
+      // Handle specific Jira API errors
+      if (error.response?.status === 401) {
+        throw new Error('Authentication failed. Please reconnect your Jira account.');
+      }
+      
+      if (error.response?.status === 403) {
+        throw new Error('Insufficient permissions to access project metadata');
+      }
+      
+      if (error.response?.status === 404) {
+        throw new Error('Project not found or you do not have access to it');
+      }
+      
+      throw new Error('Failed to fetch project metadata');
+    }
+  }
+
   // Check if Jira connection is healthy
   async checkConnectionHealth(userId, accountId = null) {
     try {
@@ -573,6 +778,155 @@ class JiraService {
         status: 'error',
         message: 'Error checking connection health'
       };
+    }
+  }
+
+  // Create a new Jira issue
+  async createIssue(userId, accountId, issueData) {
+    try {
+      const accessToken = await this.getValidAccessToken(userId, accountId);
+      
+      const account = await Token.findOne({ 
+        where: { 
+          id: accountId,
+          userId, 
+          provider: 'jira', 
+          isActive: true 
+        } 
+      });
+      
+      if (!account || !account.metadata?.cloudId) {
+        throw new Error('Jira account not found or missing cloud ID');
+      }
+
+      const { cloudId } = account.metadata;
+      const { projectKey, summary, description, issueType, priority, assignee } = issueData;
+
+      console.log('Creating Jira issue:', issueData);
+
+      // Helper function to check if a value has meaningful content
+      const hasContent = (value) => value && typeof value === 'string' && value.trim().length > 0 && !/^\s*$/.test(value);
+
+      // Validate required fields
+      if (!hasContent(projectKey)) {
+        throw new Error('Project key is required');
+      }
+      if (!hasContent(summary)) {
+        throw new Error('Summary is required');
+      }
+      if (!hasContent(issueType)) {
+        throw new Error('Issue type is required');
+      }
+
+      // Build the issue payload with only required fields
+      const issuePayload = {
+        fields: {
+          project: {
+            key: projectKey.trim()
+          },
+          summary: summary.trim(),
+          issuetype: {
+            name: issueType.trim()
+          }
+        }
+      };
+
+      // Add optional fields only if they have meaningful values
+      if (hasContent(description)) {
+        issuePayload.fields.description = {
+          type: 'doc',
+          version: 1,
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                {
+                  type: 'text',
+                  text: description.trim()
+                }
+              ]
+            }
+          ]
+        };
+      }
+
+      // Only include priority if it has meaningful content
+      if (hasContent(priority)) {
+        issuePayload.fields.priority = {
+          name: priority.trim()
+        };
+      }
+
+      // Only include assignee if it has meaningful content
+      if (hasContent(assignee)) {
+        const trimmedAssignee = assignee.trim();
+        
+        // Handle assignee by email, account ID, or username
+        if (trimmedAssignee.includes('@')) {
+          // Assign by email address
+          issuePayload.fields.assignee = {
+            emailAddress: trimmedAssignee
+          };
+        } else if (trimmedAssignee.includes(':') || trimmedAssignee.length > 10) {
+          // Assign by account ID (Atlassian account IDs are long strings)
+          issuePayload.fields.assignee = {
+            accountId: trimmedAssignee
+          };
+        } else {
+          // Assign by username (fallback)
+          issuePayload.fields.assignee = {
+            name: trimmedAssignee
+          };
+        }
+      }
+
+      console.log('Creating Jira issue with payload:', JSON.stringify(issuePayload, null, 2));
+
+      const response = await axios.post(
+        `https://api.atlassian.com/ex/jira/${cloudId}/rest/api/3/issue`,
+        issuePayload,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      console.log('Jira issue created successfully:', response.data);
+
+      // Return the created issue with additional details
+      return {
+        key: response.data.key,
+        id: response.data.id,
+        self: response.data.self,
+        summary: summary,
+        projectKey: projectKey,
+        issueType: issueType,
+        priority: priority,
+        assignee: assignee
+      };
+
+    } catch (error) {
+      console.error('Error creating Jira issue:', error.response?.data || error.message);
+      
+      // Handle specific Jira API errors
+      if (error.response?.status === 400) {
+        const errorDetails = error.response.data?.errors || {};
+        const errorMessages = Object.values(errorDetails).join(', ');
+        throw new Error(`Invalid issue data: ${errorMessages || 'Please check the project key and required fields'}`);
+      }
+      
+      if (error.response?.status === 403) {
+        throw new Error('Insufficient permissions to create issues in this project');
+      }
+      
+      if (error.response?.status === 404) {
+        throw new Error('Project not found or you do not have access to it');
+      }
+      
+      throw new Error('Failed to create Jira issue');
     }
   }
 }
