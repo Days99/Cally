@@ -72,7 +72,14 @@ const Login = () => {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="card max-w-md w-full">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-primary-600 mb-2">Cally</h1>
+          <div className="flex items-center justify-center mb-4">
+            <img 
+              src="/cally_sunrise_calendar_icon.svg" 
+              alt="Cally Icon" 
+              className="h-12 w-12 mr-3"
+            />
+            <h1 className="text-3xl font-bold text-primary-600">Cally</h1>
+          </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
             Welcome Back
           </h2>

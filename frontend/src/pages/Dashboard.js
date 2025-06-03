@@ -90,9 +90,16 @@ const Dashboard = () => {
     <div className="space-y-6">
       {/* Welcome Header */}
       <div className="bg-gradient-to-r from-primary-600 to-primary-700 rounded-lg p-6 text-white">
-        <h1 className="text-3xl font-bold mb-2">
-          Welcome back, {user?.name || 'User'}! 👋
-        </h1>
+        <div className="flex items-center mb-4">
+          <img 
+            src="/cally_sunrise_calendar_icon.svg" 
+            alt="Cally Icon" 
+            className="h-12 w-12 mr-4"
+          />
+          <h1 className="text-3xl font-bold">
+            Welcome back, {user?.name || 'User'}! 👋
+          </h1>
+        </div>
         <p className="text-primary-100">
           Your unified calendar and task management dashboard
         </p>
