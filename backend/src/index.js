@@ -109,61 +109,106 @@ async function initializeDatabase() {
     await sequelize.authenticate();
     console.log('✅ Database connection established.');
     
-    // Check if core tables exist
-    const tableCheckQueries = [
-      "SELECT to_regclass('users') as users_exists",
-      "SELECT to_regclass('tokens') as tokens_exists", 
-      "SELECT to_regclass('calendar_events') as events_exists"
-    ];
-    
+    // Check if core tables exist and have basic structure
     let tablesExist = false;
+    let needsSync = false;
+    
     try {
+      // Check if core tables exist using a more comprehensive approach
+      const tableCheckQueries = [
+        "SELECT to_regclass('public.users') as table_exists",
+        "SELECT to_regclass('public.tokens') as table_exists", 
+        "SELECT to_regclass('public.calendar_events') as table_exists"
+      ];
+      
       const results = await Promise.all(
         tableCheckQueries.map(query => sequelize.query(query, { type: sequelize.QueryTypes.SELECT }))
       );
       
       // Check if all core tables exist
-      tablesExist = results.every(result => {
-        const key = Object.keys(result[0])[0];
-        return result[0][key] !== null;
-      });
+      tablesExist = results.every(result => result[0].table_exists !== null);
       
-      console.log(`📊 Core tables exist: ${tablesExist}`);
       if (tablesExist) {
         console.log('✅ Found existing tables: users, tokens, calendar_events');
+        
+        // Do a simple column check to see if tables need updates
+        try {
+          // Try to access key columns to verify table structure
+          await sequelize.query("SELECT id, email FROM users LIMIT 1", { type: sequelize.QueryTypes.SELECT });
+          await sequelize.query("SELECT id, user_id, provider FROM tokens LIMIT 1", { type: sequelize.QueryTypes.SELECT });
+          await sequelize.query("SELECT id, user_id, title FROM calendar_events LIMIT 1", { type: sequelize.QueryTypes.SELECT });
+          
+          console.log('✅ Table structure verified - no sync needed');
+          needsSync = false;
+        } catch (columnError) {
+          console.log('⚠️  Table structure needs updates:', columnError.message);
+          needsSync = true;
+        }
       } else {
-        console.log('📝 Some core tables are missing - will create them');
+        console.log('📝 Core tables missing - will create them');
+        needsSync = true;
       }
+      
     } catch (error) {
-      console.log('⚠️  Could not check table existence, assuming new database');
+      console.log('⚠️  Could not check table existence:', error.message);
       tablesExist = false;
+      needsSync = true;
     }
     
     // Determine sync strategy
     let syncOptions;
     let syncDescription;
     
-    if (!tablesExist) {
+    // Always force sync if explicitly requested
+    if (process.env.FORCE_DB_SYNC === 'true') {
+      syncOptions = { force: true };
+      syncDescription = 'FORCE (explicit override via FORCE_DB_SYNC=true)';
+      needsSync = true;
+    } else if (!needsSync) {
+      // Tables exist and structure is good - skip sync entirely
+      console.log('⏭️  Database is up to date - skipping sync');
+      return true;
+    } else if (!tablesExist) {
       // No tables exist - safe to force create
       syncOptions = { force: true };
       syncDescription = 'FORCE (create all tables - new database)';
     } else {
-      // Tables exist - try to alter existing structure
-      syncOptions = { alter: true };
-      syncDescription = 'ALTER (update existing tables)';
+      // Tables exist but need updates - use a conservative approach
+      // Instead of ALTER (which causes syntax errors), we'll use force with a warning
+      console.log('⚠️  Tables exist but need updates. For safety, we recommend backing up data first.');
+      console.log('💡 To update safely, set FORCE_DB_SYNC=true after backing up data.');
+      console.log('🔄 For now, attempting minimal sync...');
+      
+      // Try a minimal sync first (no force, no alter)
+      try {
+        await sequelize.sync({ });
+        console.log('✅ Minimal sync completed successfully.');
+        return true;
+      } catch (syncError) {
+        console.log('❌ Minimal sync failed:', syncError.message);
+        
+        // If minimal sync fails, force user to make explicit choice
+        if (process.env.NODE_ENV === 'production') {
+          console.error('🚨 PRODUCTION MODE: Cannot automatically recreate tables.');
+          console.error('🚨 Please set FORCE_DB_SYNC=true to recreate tables (DATA WILL BE LOST)');
+          console.error('🚨 Or fix the database schema manually.');
+          throw new Error('Database schema update required in production');
+        } else {
+          console.log('🔄 Development mode: Attempting force sync...');
+          syncOptions = { force: true };
+          syncDescription = 'FORCE (development fallback after minimal sync failed)';
+        }
+      }
     }
     
-    // Override for explicit force sync
-    if (process.env.FORCE_DB_SYNC === 'true') {
-      syncOptions = { force: true };
-      syncDescription = 'FORCE (explicit override via FORCE_DB_SYNC=true)';
+    // Only perform sync if we determined we need it
+    if (syncOptions) {
+      console.log('🔄 Synchronizing database tables...');
+      console.log(`📝 Sync mode: ${syncDescription}`);
+      
+      await sequelize.sync(syncOptions);
+      console.log('✅ Database tables synchronized.');
     }
-    
-    console.log('🔄 Synchronizing database tables...');
-    console.log(`📝 Sync mode: ${syncDescription}`);
-    
-    await sequelize.sync(syncOptions);
-    console.log('✅ Database tables synchronized.');
     
     return true;
   } catch (error) {
@@ -173,16 +218,25 @@ async function initializeDatabase() {
       console.log('💡 SSL Error - Make sure NODE_ENV=production and DATABASE_URL is correct');
     }
     
-    // If we get a syntax error during alter, try force sync
+    // More conservative error handling - don't automatically force sync
     if (error.message.includes('syntax error') || error.message.includes('USING')) {
-      console.log('🔄 Syntax error detected, attempting force sync (recreate tables)...');
-      try {
-        await sequelize.sync({ force: true });
-        console.log('✅ Database tables created successfully with force sync.');
-        return true;
-      } catch (forceError) {
-        console.error('❌ Failed to create tables with force sync:', forceError.message);
-        throw forceError;
+      console.error('🚨 SQL Syntax Error: This indicates a Sequelize ALTER operation issue.');
+      console.error('🚨 This often happens with enum columns or complex schema changes.');
+      console.error('💡 Solutions:');
+      console.error('   1. Set FORCE_DB_SYNC=true to recreate tables (DATA WILL BE LOST)');
+      console.error('   2. Update your database schema manually');
+      console.error('   3. Use a proper database migration tool');
+      
+      if (process.env.NODE_ENV !== 'production' && process.env.AUTO_FORCE_SYNC === 'true') {
+        console.log('🔄 AUTO_FORCE_SYNC enabled in development - attempting force sync...');
+        try {
+          await sequelize.sync({ force: true });
+          console.log('✅ Database tables created successfully with force sync.');
+          return true;
+        } catch (forceError) {
+          console.error('❌ Failed to create tables with force sync:', forceError.message);
+          throw forceError;
+        }
       }
     }
     
