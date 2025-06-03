@@ -38,6 +38,18 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
   const [jiraIssues, setJiraIssues] = useState([]);
   const [loadingJiraIssues, setLoadingJiraIssues] = useState(false);
 
+  // Jira dynamic metadata states (same as Tasks page)
+  const [projects, setProjects] = useState([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [projectMetadata, setProjectMetadata] = useState({
+    issueTypes: [],
+    priorities: [],
+    assignableUsers: []
+  });
+  const [loadingMetadata, setLoadingMetadata] = useState(false);
+  const [issueTransitions, setIssueTransitions] = useState([]);
+  const [loadingTransitions, setLoadingTransitions] = useState(false);
+
   // Event type configurations
   const eventTypes = {
     manual: {
@@ -129,6 +141,143 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
     }
   }, [formData.eventType, formData.jiraAssociationType, formData.accountId]);
 
+  // Load Jira projects (same as Tasks page)
+  const loadProjects = useCallback(async (accountId) => {
+    if (!accountId) {
+      setProjects([]);
+      return;
+    }
+
+    try {
+      setLoadingProjects(true);
+      console.log('Loading Jira projects for account:', accountId);
+      const projectsData = await accountService.getJiraProjects(accountId);
+      console.log('Loaded Jira projects:', projectsData);
+      setProjects(Array.isArray(projectsData) ? projectsData : []);
+    } catch (error) {
+      console.error('Failed to load Jira projects:', error);
+      setError(`Failed to load Jira projects: ${error.message}`);
+      setProjects([]);
+    } finally {
+      setLoadingProjects(false);
+    }
+  }, []);
+
+  // Load project metadata (same as Tasks page)
+  const loadProjectMetadata = useCallback(async (accountId, projectKey) => {
+    if (!accountId || !projectKey) {
+      setProjectMetadata({
+        issueTypes: [],
+        priorities: [],
+        assignableUsers: []
+      });
+      return;
+    }
+
+    try {
+      setLoadingMetadata(true);
+      setError(null);
+      const metadata = await accountService.getJiraProjectMetadata(accountId, projectKey);
+      setProjectMetadata(metadata);
+      
+      // Helper function to check if a value has meaningful content
+      const hasContent = (value) => value && typeof value === 'string' && value.trim().length > 0;
+      
+      // Always update form fields based on metadata availability
+      const updates = {};
+      
+      if (metadata.issueTypes.length > 0) {
+        // Check if current value is valid for this project
+        const isValidIssueType = metadata.issueTypes.some(it => it.name === formData.jiraIssueType);
+        if (!isValidIssueType) {
+          // Set first available issue type (no hardcoded defaults)
+          updates.jiraIssueType = metadata.issueTypes[0].name;
+        }
+      } else {
+        // Always clear if not available
+        updates.jiraIssueType = '';
+      }
+      
+      if (metadata.priorities.length > 0) {
+        // Check if current value is valid for this project
+        const isValidPriority = metadata.priorities.some(p => p.name === formData.priority);
+        if (!isValidPriority) {
+          // Set middle priority or first available (no hardcoded defaults)
+          const middleIndex = Math.floor(metadata.priorities.length / 2);
+          updates.priority = metadata.priorities[middleIndex].name;
+        }
+      } else {
+        // Always clear if not available
+        updates.priority = '';
+      }
+      
+      if (metadata.assignableUsers.length > 0) {
+        // Keep existing assignee if it's valid, otherwise clear
+        const isValidAssignee = hasContent(formData.assignee) && metadata.assignableUsers.some(user => 
+          user.accountId === formData.assignee
+        );
+        console.log('Assignee validation:', {
+          currentAssignee: formData.assignee,
+          hasContent: hasContent(formData.assignee),
+          availableUsers: metadata.assignableUsers.map(u => ({ accountId: u.accountId, displayName: u.displayName })),
+          isValidAssignee
+        });
+        if (!isValidAssignee) {
+          updates.assignee = '';
+        }
+      } else {
+        // Always clear if not available
+        updates.assignee = '';
+      }
+      
+      // Apply all updates at once
+      if (Object.keys(updates).length > 0) {
+        setFormData(prev => ({ ...prev, ...updates }));
+      }
+      
+    } catch (error) {
+      console.error('Failed to load project metadata:', error);
+      setError(`Failed to load project metadata: ${error.message}`);
+      setProjectMetadata({
+        issueTypes: [],
+        priorities: [],
+        assignableUsers: []
+      });
+      // Clear all fields when metadata loading fails
+      setFormData(prev => ({ 
+        ...prev, 
+        jiraIssueType: '', 
+        priority: '', 
+        assignee: '' 
+      }));
+    } finally {
+      setLoadingMetadata(false);
+    }
+  }, [formData.jiraIssueType, formData.priority, formData.assignee]);
+
+  // Load issue transitions for editing existing Jira tasks
+  const loadIssueTransitions = useCallback(async (accountId, issueKey) => {
+    if (!accountId || !issueKey) {
+      setIssueTransitions([]);
+      return;
+    }
+
+    try {
+      setLoadingTransitions(true);
+      console.log('Loading transitions for issue:', issueKey);
+      
+      const response = await accountService.getJiraIssueTransitions(accountId, issueKey);
+      console.log('Loaded transitions:', response);
+      
+      setIssueTransitions(response.transitions || []);
+    } catch (error) {
+      console.error('Failed to load transitions:', error);
+      setIssueTransitions([]);
+    } finally {
+      setLoadingTransitions(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (isOpen) {
       loadAccounts();
@@ -177,6 +326,20 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
           labels: metadata.labels || []
         });
         setIsEditing(false);
+
+        // Load Jira data if it's a Jira task
+        if (eventType === 'jira_task' && accountId) {
+          if (metadata.projectKey || event.extendedProps?.jiraKey?.split('-')[0]) {
+            const projectKey = metadata.projectKey || event.extendedProps?.jiraKey?.split('-')[0];
+            loadProjects(accountId);
+            loadProjectMetadata(accountId, projectKey);
+          }
+          
+          // Load transitions if we have an existing issue
+          if (event.extendedProps?.jiraKey) {
+            loadIssueTransitions(accountId, event.extendedProps.jiraKey);
+          }
+        }
       } else if (isCreating) {
         // Creating new event
         console.log('Creating new event with defaultDate:', defaultDate);
@@ -207,7 +370,7 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
           isAllDay: false,
           priority: 'medium',
           jiraProjectKey: '',
-          jiraIssueType: 'Task',
+          jiraIssueType: '',
           googleCalendarId: 'primary',
           assignee: '',
           labels: [],
@@ -229,9 +392,16 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
       // Reset state when modal closes
       setAccountsLoaded(false);
       setAccounts([]);
+      setProjects([]);
+      setProjectMetadata({
+        issueTypes: [],
+        priorities: [],
+        assignableUsers: []
+      });
+      setIssueTransitions([]);
       setError(null);
     }
-  }, [event, isOpen, isCreating, defaultDate, getEventType, loadAccounts]);
+  }, [event, isOpen, isCreating, defaultDate, getEventType, loadAccounts, loadProjects, loadProjectMetadata, loadIssueTransitions]);
 
   useEffect(() => {
     loadAccounts();
@@ -240,6 +410,23 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
   useEffect(() => {
     loadJiraIssues();
   }, [loadJiraIssues]);
+
+  // Set default project when creating new Jira events and projects load
+  useEffect(() => {
+    if (isCreating && formData.eventType === 'jira_task' && projects.length > 0 && !formData.jiraProjectKey) {
+      // Set first project as default when creating new events
+      const firstProject = projects[0];
+      setFormData(prev => ({
+        ...prev,
+        jiraProjectKey: firstProject.key
+      }));
+      
+      // Load metadata for the default project
+      if (formData.accountId) {
+        loadProjectMetadata(formData.accountId, firstProject.key);
+      }
+    }
+  }, [isCreating, formData.eventType, formData.accountId, formData.jiraProjectKey, projects, loadProjectMetadata]);
 
   const formatDateTimeForInput = (date) => {
     if (!date) {
@@ -296,6 +483,104 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
+    
+    // Handle account change - load projects and reset project selection
+    if (name === 'accountId') {
+      setFormData(prev => ({
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value,
+        jiraProjectKey: '', // Reset project when account changes
+        jiraIssueType: '', // Reset issue type when account changes
+        priority: 'medium', // Reset priority when account changes
+        assignee: '', // Reset assignee when account changes
+        existingJiraKey: '' // Reset existing issue when account changes
+      }));
+      
+      // Load projects for the selected account (only for Jira tasks)
+      if (value && formData.eventType === 'jira_task') {
+        loadProjects(value);
+      } else {
+        setProjects([]);
+      }
+      
+      // Clear metadata when account changes
+      setProjectMetadata({
+        issueTypes: [],
+        priorities: [],
+        assignableUsers: []
+      });
+      setIssueTransitions([]);
+      return;
+    }
+
+    // Handle project change - load metadata and reset dependent fields
+    if (name === 'jiraProjectKey') {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value,
+        jiraIssueType: '', // Reset issue type when project changes
+        priority: 'medium', // Reset priority when project changes
+        assignee: '' // Reset assignee when project changes
+      }));
+      
+      // Load metadata for the selected project
+      if (value && formData.accountId) {
+        loadProjectMetadata(formData.accountId, value);
+      } else {
+        setProjectMetadata({
+          issueTypes: [],
+          priorities: [],
+          assignableUsers: []
+        });
+      }
+      return;
+    }
+
+    // Handle existing Jira key change - load transitions for editing status
+    if (name === 'existingJiraKey') {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+      
+      // Load transitions for the selected issue
+      if (value && formData.accountId) {
+        loadIssueTransitions(formData.accountId, value);
+      } else {
+        setIssueTransitions([]);
+      }
+      return;
+    }
+
+    // Handle event type change
+    if (name === 'eventType') {
+      const newValue = type === 'checkbox' ? checked : value;
+      setFormData(prev => ({
+        ...prev,
+        [name]: newValue,
+        // Reset Jira-specific fields when changing event type
+        jiraProjectKey: '',
+        jiraIssueType: '',
+        assignee: '',
+        existingJiraKey: ''
+      }));
+      
+      // Load projects if switching to Jira task and account is selected
+      if (newValue === 'jira_task' && formData.accountId) {
+        loadProjects(formData.accountId);
+      } else {
+        setProjects([]);
+        setProjectMetadata({
+          issueTypes: [],
+          priorities: [],
+          assignableUsers: []
+        });
+        setIssueTransitions([]);
+      }
+      return;
+    }
+
+    // Default case for all other inputs
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
@@ -481,6 +766,42 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
     }
     if (e.key === 'Escape') {
       onClose();
+    }
+  };
+
+  // Handle Jira status transition
+  const handleStatusTransition = async (transitionId) => {
+    if (!formData.accountId || !formData.existingJiraKey) return;
+
+    try {
+      setLoadingTransitions(true);
+      
+      console.log('Updating status for issue:', formData.existingJiraKey, 'transition:', transitionId);
+      
+      await accountService.updateJiraIssueStatus(formData.accountId, formData.existingJiraKey, transitionId);
+      
+      // Find the transition to get the new status
+      const selectedTransition = issueTransitions.find(t => t.id === transitionId);
+      const newStatusName = selectedTransition?.to?.name || 'Updated';
+      
+      console.log(`Successfully updated ${formData.existingJiraKey} to ${newStatusName}`);
+      
+      // Reload transitions in case new ones are available
+      setTimeout(() => loadIssueTransitions(formData.accountId, formData.existingJiraKey), 500);
+      
+      // Update form with new status if needed
+      if (selectedTransition?.to?.name) {
+        setFormData(prev => ({
+          ...prev,
+          status: selectedTransition.to.name.toLowerCase().replace(/\s+/g, '_')
+        }));
+      }
+      
+    } catch (error) {
+      console.error('Error updating status:', error);
+      setError(`Failed to update status: ${error.message}`);
+    } finally {
+      setLoadingTransitions(false);
     }
   };
 
@@ -804,52 +1125,177 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                             })()}
                           </div>
                         )}
+
+                        {/* Status Transitions for Existing Issues */}
+                        {formData.existingJiraKey && issueTransitions.length > 0 && (
+                          <div className="mt-3 p-3 bg-white border border-green-200 rounded">
+                            <h5 className="text-xs font-medium text-green-800 mb-2">Available Status Transitions</h5>
+                            <div className="grid grid-cols-1 gap-2">
+                              {issueTransitions.map((transition) => (
+                                <button
+                                  key={transition.id}
+                                  type="button"
+                                  onClick={() => handleStatusTransition(transition.id)}
+                                  disabled={loadingTransitions}
+                                  className="px-3 py-2 text-xs bg-green-100 hover:bg-green-200 border border-green-300 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-medium">
+                                      {transition.name}
+                                      {transition.to?.name && (
+                                        <span className="text-green-600 font-normal">
+                                          {' → ' + transition.to.name}
+                                        </span>
+                                      )}
+                                    </span>
+                                    {loadingTransitions && (
+                                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600"></div>
+                                    )}
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-4">
+                      {/* Dynamic Project Selection */}
                       <div>
                         <label className="block text-xs font-medium text-green-700 mb-1">
-                          Project Key *
+                          Project *
                         </label>
-                        <input
-                          type="text"
-                          name="jiraProjectKey"
-                          value={formData.jiraProjectKey}
-                          onChange={handleInputChange}
-                          placeholder="e.g., PROJ"
-                          className="w-full px-2 py-1 text-sm border border-green-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
-                        />
+                        {loadingProjects ? (
+                          <div className="w-full px-2 py-1 text-sm border border-green-300 rounded bg-green-50 text-green-600 flex items-center">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600 mr-2"></div>
+                            Loading projects...
+                          </div>
+                        ) : projects.length > 0 ? (
+                          <select
+                            name="jiraProjectKey"
+                            value={formData.jiraProjectKey}
+                            onChange={handleInputChange}
+                            className="w-full px-2 py-1 text-sm border border-green-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                            required
+                          >
+                            <option value="">Select a project...</option>
+                            {projects.map(project => (
+                              <option key={project.key} value={project.key}>
+                                {project.key} - {project.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : formData.accountId && !loadingProjects ? (
+                          <div className="w-full px-2 py-1 text-sm border border-orange-300 rounded bg-orange-50">
+                            <p className="text-orange-700">No projects found for this account.</p>
+                            <p className="text-xs text-orange-600 mt-1">
+                              Make sure you have permissions to create issues.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="w-full px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50 text-gray-500">
+                            Select a Jira account first to load projects
+                          </div>
+                        )}
+                        {loadingProjects && (
+                          <div className="mt-1 flex items-center text-xs text-green-600">
+                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600 mr-1"></div>
+                            Loading available projects...
+                          </div>
+                        )}
                       </div>
-                      <div>
-                        <label className="block text-xs font-medium text-green-700 mb-1">
-                          Issue Type
-                        </label>
-                        <select
-                          name="jiraIssueType"
-                          value={formData.jiraIssueType}
-                          onChange={handleInputChange}
-                          className="w-full px-2 py-1 text-sm border border-green-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
-                        >
-                          <option value="Task">Task</option>
-                          <option value="Story">Story</option>
-                          <option value="Bug">Bug</option>
-                          <option value="Epic">Epic</option>
-                        </select>
+
+                      {/* Dynamic Issue Type - only show if data is available */}
+                      {projectMetadata.issueTypes.length > 0 && (
+                        <div>
+                          <label className="block text-xs font-medium text-green-700 mb-1">
+                            Issue Type *
+                          </label>
+                          <select
+                            name="jiraIssueType"
+                            value={formData.jiraIssueType}
+                            onChange={handleInputChange}
+                            className="w-full px-2 py-1 text-sm border border-green-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                            disabled={loadingMetadata}
+                            required
+                          >
+                            <option value="">
+                              {loadingMetadata ? "Loading issue types..." : "Select issue type..."}
+                            </option>
+                            {projectMetadata.issueTypes.map(issueType => (
+                              <option key={issueType.id} value={issueType.name}>
+                                {issueType.name}
+                              </option>
+                            ))}
+                          </select>
+                          {loadingMetadata && (
+                            <div className="mt-1 flex items-center text-xs text-green-600">
+                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600 mr-1"></div>
+                              Loading project configuration...
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Dynamic Priority and Assignee Grid - only show sections with data */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Dynamic Priority - only show if data is available */}
+                        {projectMetadata.priorities.length > 0 && (
+                          <div>
+                            <label className="block text-xs font-medium text-green-700 mb-1">
+                              Priority
+                            </label>
+                            <select
+                              name="priority"
+                              value={formData.priority}
+                              onChange={handleInputChange}
+                              className="w-full px-2 py-1 text-sm border border-green-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                              disabled={loadingMetadata}
+                            >
+                              <option value="">
+                                {loadingMetadata ? "Loading priorities..." : "Select priority..."}
+                              </option>
+                              {projectMetadata.priorities.map(priority => (
+                                <option key={priority.id} value={priority.name}>
+                                  {priority.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                        {/* Dynamic Assignee - only show if data is available */}
+                        {projectMetadata.assignableUsers.length > 0 && (
+                          <div>
+                            <label className="block text-xs font-medium text-green-700 mb-1">
+                              Assignee
+                            </label>
+                            <select
+                              name="assignee"
+                              value={formData.assignee}
+                              onChange={handleInputChange}
+                              className="w-full px-2 py-1 text-sm border border-green-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                              disabled={loadingMetadata}
+                            >
+                              <option value="">Unassigned</option>
+                              {projectMetadata.assignableUsers.map(user => (
+                                <option key={user.accountId} value={user.accountId}>
+                                  {user.displayName} ({user.emailAddress || user.accountId})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
                       </div>
-                      <div className="col-span-2">
-                        <label className="block text-xs font-medium text-green-700 mb-1">
-                          Assignee
-                        </label>
-                        <input
-                          type="text"
-                          name="assignee"
-                          value={formData.assignee}
-                          onChange={handleInputChange}
-                          placeholder="Username or email"
-                          className="w-full px-2 py-1 text-sm border border-green-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
-                        />
-                      </div>
+
+                      {/* Additional metadata loading indicator */}
+                      {loadingMetadata && formData.jiraProjectKey && (
+                        <div className="text-xs text-green-600 flex items-center">
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600 mr-2"></div>
+                          Loading project metadata (issue types, priorities, assignable users)...
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
