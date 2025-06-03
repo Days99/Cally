@@ -54,13 +54,20 @@ class GoogleCalendarService {
     try {
       const calendar = await this.getCalendarClient(userId);
       
+      // Default to a full year range for better event coverage
+      const now = new Date();
+      const startOfYear = new Date(now.getFullYear(), 0, 1); // January 1st of current year
+      const endOfYear = new Date(now.getFullYear() + 1, 0, 1); // January 1st of next year
+      
       const {
-        timeMin = new Date().toISOString(),
-        timeMax = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
-        maxResults = 250,
+        timeMin = startOfYear.toISOString(),
+        timeMax = endOfYear.toISOString(),
+        maxResults = 2500, // Increased for full year
         singleEvents = true,
         orderBy = 'startTime'
       } = options;
+
+      console.log(`📅 Fetching Google Calendar events from ${timeMin} to ${timeMax} (maxResults: ${maxResults})`);
 
       const response = await calendar.events.list({
         calendarId,
@@ -71,6 +78,7 @@ class GoogleCalendarService {
         orderBy
       });
 
+      console.log(`📅 Retrieved ${response.data.items?.length || 0} events from Google Calendar`);
       return response.data.items;
     } catch (error) {
       console.error('Error fetching calendar events:', error);
@@ -90,10 +98,14 @@ class GoogleCalendarService {
       // Get Google event IDs for comparison
       const googleEventIds = new Set(googleEvents.map(event => event.id));
 
-      // First, get existing events from database for this calendar and time range
+      // Get the date range (use same defaults as getCalendarEvents)
+      const now = new Date();
+      const startOfYear = new Date(now.getFullYear(), 0, 1);
+      const endOfYear = new Date(now.getFullYear() + 1, 0, 1);
+      
       const {
-        timeMin = new Date().toISOString(),
-        timeMax = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+        timeMin = startOfYear.toISOString(),
+        timeMax = endOfYear.toISOString()
       } = options;
 
       const existingEvents = await CalendarEvent.findAll({
@@ -137,7 +149,11 @@ class GoogleCalendarService {
       }
 
       console.log(`Synced ${syncedEvents.length} events, removed ${deletedEvents.length} deleted events for user ${userId}`);
-      return syncedEvents;
+      return {
+        events: syncedEvents,
+        synced: syncedEvents.length,
+        deleted: deletedEvents.length
+      };
     } catch (error) {
       console.error('Error syncing calendar events:', error);
       throw error;
@@ -383,6 +399,51 @@ class GoogleCalendarService {
     } catch (error) {
       console.error('Error deleting calendar event:', error);
       throw new Error('Failed to delete calendar event');
+    }
+  }
+
+  // Sync all calendars for a user
+  async syncAllCalendars(userId, options = {}) {
+    try {
+      console.log(`🔄 Starting comprehensive sync for user ${userId}`);
+      
+      // Get all user's calendars
+      const calendars = await this.getUserCalendars(userId);
+      console.log(`📅 Found ${calendars.length} calendars to sync`);
+      
+      let totalSynced = 0;
+      let totalDeleted = 0;
+      const errors = [];
+      
+      // Sync each calendar
+      for (const calendar of calendars) {
+        try {
+          console.log(`📅 Syncing calendar: ${calendar.name} (${calendar.id})`);
+          const syncedEvents = await this.syncCalendarEvents(userId, calendar.id, options);
+          totalSynced += syncedEvents.synced;
+          totalDeleted += syncedEvents.deleted;
+          console.log(`✅ Synced ${syncedEvents.synced} events from ${calendar.name}`);
+        } catch (error) {
+          console.error(`❌ Failed to sync calendar ${calendar.name}:`, error);
+          errors.push({
+            calendarId: calendar.id,
+            calendarName: calendar.name,
+            error: error.message
+          });
+        }
+      }
+      
+      console.log(`🎉 Comprehensive sync completed: ${totalSynced} events synced from ${calendars.length} calendars`);
+      
+      return {
+        synced: totalSynced,
+        deleted: totalDeleted,
+        calendarsProcessed: calendars.length,
+        errors
+      };
+    } catch (error) {
+      console.error('Error in syncAllCalendars:', error);
+      throw error;
     }
   }
 }

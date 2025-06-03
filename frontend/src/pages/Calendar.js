@@ -184,21 +184,36 @@ const Calendar = () => {
       setSyncing(true);
       setError(null);
 
-      const calendarApi = calendarRef.current?.getApi();
-      const currentView = calendarApi?.view;
+      // Use full year range for comprehensive sync instead of just current view
+      const now = new Date();
+      const startOfYear = new Date(now.getFullYear(), 0, 1);
+      const endOfYear = new Date(now.getFullYear() + 1, 0, 1);
       
-      // Get current calendar view date range for focused sync
-      const dateRange = currentView ? {
-        timeMin: currentView.activeStart.toISOString(),
-        timeMax: currentView.activeEnd.toISOString()
-      } : calendarService.getDateRange(view);
+      const dateRange = {
+        timeMin: startOfYear.toISOString(),
+        timeMax: endOfYear.toISOString(),
+        maxResults: 2500 // Increased for full year
+      };
 
-      console.log(`📊 Sync date range: ${dateRange.timeMin} to ${dateRange.timeMax}`);
+      console.log(`📊 Full year sync range: ${dateRange.timeMin} to ${dateRange.timeMax}`);
 
       // Call unified sync endpoint that handles both Google Calendar and Jira
       const syncResult = await calendarService.syncAllSources(dateRange);
       
       console.log('📊 Sync results:', syncResult);
+      
+      // Show detailed sync results
+      if (syncResult.syncResults) {
+        const { googleCalendar, jiraTasks, total } = syncResult.syncResults;
+        console.log(`📊 Detailed Sync Results:`);
+        console.log(`   📅 Google Calendar: ${googleCalendar.synced} synced, ${googleCalendar.deleted} deleted`);
+        console.log(`   📋 Jira Tasks: ${jiraTasks.synced} synced, ${jiraTasks.deleted} deleted`);
+        console.log(`   🎯 Total: ${total.synced} synced, ${total.deleted} deleted`);
+        
+        if (total.errors && total.errors.length > 0) {
+          console.warn(`⚠️  Sync errors:`, total.errors);
+        }
+      }
       
       // Reload events from unified database
       await loadEvents();

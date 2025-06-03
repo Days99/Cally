@@ -13,8 +13,8 @@ const PORT = process.env.PORT || 3001;
 // Production-ready CORS configuration
 const allowedOrigins = [
   process.env.FRONTEND_URL || 'http://localhost:3000',
-  'http://localhost:3000', // For development
-  'http://localhost:3001', // For development
+  'http://localhost:3000', // Frontend dev server
+  'http://localhost:3001', // Backend dev server
   'https://cally.pt',      // Production domain
   'https://www.cally.pt',  // Production domain with www
   'https://cally-frontend.vercel.app' // Vercel deployment (if different)
@@ -33,7 +33,18 @@ app.use(cors({
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    // For localhost development, be more permissive
+    if (process.env.NODE_ENV !== 'production') {
+      if (origin.startsWith('http://localhost:') || origin.startsWith('https://localhost:')) {
+        return callback(null, true);
+      }
+    }
+    
+    // Remove trailing slash for comparison
+    const normalizedOrigin = origin.replace(/\/$/, '');
+    const normalizedAllowedOrigins = allowedOrigins.map(o => o.replace(/\/$/, ''));
+    
+    if (normalizedAllowedOrigins.includes(normalizedOrigin)) {
       callback(null, true);
     } else {
       console.log('❌ Blocked by CORS:', origin);
@@ -41,6 +52,7 @@ app.use(cors({
       console.log('🌍 Environment variables:');
       console.log('   FRONTEND_URL:', process.env.FRONTEND_URL);
       console.log('   ALLOWED_ORIGINS:', process.env.ALLOWED_ORIGINS);
+      console.log('   NODE_ENV:', process.env.NODE_ENV);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -97,15 +109,58 @@ async function initializeDatabase() {
     await sequelize.authenticate();
     console.log('✅ Database connection established.');
     
-    // For production with new databases, use force: true to avoid alter issues
-    // For development, use alter: true for existing databases
-    const isNewDatabase = process.env.FORCE_DB_SYNC === 'true' || process.env.NODE_ENV === 'production';
-    const syncOptions = isNewDatabase 
-      ? { force: true } // Clean slate - drops and recreates all tables
-      : { alter: true }; // Try to alter existing tables
+    // Check if core tables exist
+    const tableCheckQueries = [
+      "SELECT to_regclass('users') as users_exists",
+      "SELECT to_regclass('tokens') as tokens_exists", 
+      "SELECT to_regclass('calendar_events') as events_exists"
+    ];
+    
+    let tablesExist = false;
+    try {
+      const results = await Promise.all(
+        tableCheckQueries.map(query => sequelize.query(query, { type: sequelize.QueryTypes.SELECT }))
+      );
+      
+      // Check if all core tables exist
+      tablesExist = results.every(result => {
+        const key = Object.keys(result[0])[0];
+        return result[0][key] !== null;
+      });
+      
+      console.log(`📊 Core tables exist: ${tablesExist}`);
+      if (tablesExist) {
+        console.log('✅ Found existing tables: users, tokens, calendar_events');
+      } else {
+        console.log('📝 Some core tables are missing - will create them');
+      }
+    } catch (error) {
+      console.log('⚠️  Could not check table existence, assuming new database');
+      tablesExist = false;
+    }
+    
+    // Determine sync strategy
+    let syncOptions;
+    let syncDescription;
+    
+    if (!tablesExist) {
+      // No tables exist - safe to force create
+      syncOptions = { force: true };
+      syncDescription = 'FORCE (create all tables - new database)';
+    } else {
+      // Tables exist - try to alter existing structure
+      syncOptions = { alter: true };
+      syncDescription = 'ALTER (update existing tables)';
+    }
+    
+    // Override for explicit force sync
+    if (process.env.FORCE_DB_SYNC === 'true') {
+      syncOptions = { force: true };
+      syncDescription = 'FORCE (explicit override via FORCE_DB_SYNC=true)';
+    }
     
     console.log('🔄 Synchronizing database tables...');
-    console.log(`📝 Sync mode: ${isNewDatabase ? 'FORCE (recreate all)' : 'ALTER (modify existing)'}`);
+    console.log(`📝 Sync mode: ${syncDescription}`);
     
     await sequelize.sync(syncOptions);
     console.log('✅ Database tables synchronized.');

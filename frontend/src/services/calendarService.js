@@ -229,6 +229,7 @@ class CalendarService {
         end.setDate(start.getDate() + 6);
         break;
       case 'day':
+        start.setDate(date.getDate());
         end.setDate(date.getDate());
         break;
       case 'month':
@@ -238,9 +239,9 @@ class CalendarService {
         break;
     }
 
-    // Add some padding for better sync coverage
-    start.setDate(start.getDate() - 7);
-    end.setDate(end.getDate() + 7);
+    // Add more generous padding for better sync coverage
+    start.setDate(start.getDate() - 30); // 30 days before
+    end.setDate(end.getDate() + 60);     // 60 days after
 
     return {
       timeMin: start.toISOString(),

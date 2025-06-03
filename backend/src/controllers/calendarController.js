@@ -88,11 +88,11 @@ class CalendarController {
     try {
       const userId = req.user.id;
       const { calendarId = 'primary' } = req.params;
-      const { timeMin, timeMax, maxResults = 250 } = req.query;
+      const { timeMin, timeMax, maxResults = 2500 } = req.query;
 
       console.log(`Manual sync requested for user ${userId}, calendar ${calendarId}`);
       
-      const events = await googleCalendarService.syncCalendarEvents(userId, calendarId, {
+      const result = await googleCalendarService.syncCalendarEvents(userId, calendarId, {
         timeMin,
         timeMax,
         maxResults: parseInt(maxResults)
@@ -100,7 +100,7 @@ class CalendarController {
 
       res.json({
         success: true,
-        events: events.map(event => ({
+        events: result.events.map(event => ({
           id: event.id,
           googleEventId: event.externalId,
           title: event.title,
@@ -109,8 +109,9 @@ class CalendarController {
           isAllDay: event.isAllDay,
           lastSyncAt: event.lastSyncAt
         })),
-        count: events.length,
-        message: `Successfully synced ${events.length} events`
+        count: result.synced,
+        deleted: result.deleted,
+        message: `Successfully synced ${result.synced} events, removed ${result.deleted} deleted events`
       });
     } catch (error) {
       console.error('Error syncing calendar events:', error);
@@ -125,7 +126,7 @@ class CalendarController {
   async syncAllCalendarSources(req, res) {
     try {
       const userId = req.user.id;
-      const { timeMin, timeMax, maxResults = 250 } = req.query;
+      const { timeMin, timeMax, maxResults = 2500 } = req.query;
 
       console.log(`🔄 Unified sync requested for user ${userId}`);
       
@@ -138,14 +139,18 @@ class CalendarController {
       // 1. Sync Google Calendar events
       try {
         console.log('📅 Syncing Google Calendar events...');
-        const googleEvents = await googleCalendarService.syncCalendarEvents(userId, 'primary', {
+        const googleResult = await googleCalendarService.syncAllCalendars(userId, {
           timeMin,
           timeMax,
           maxResults: parseInt(maxResults)
         });
         
-        syncResults.googleCalendar.synced = googleEvents.length;
-        console.log(`✅ Google Calendar: ${googleEvents.length} events synced`);
+        syncResults.googleCalendar.synced = googleResult.synced;
+        syncResults.googleCalendar.deleted = googleResult.deleted;
+        if (googleResult.errors.length > 0) {
+          syncResults.googleCalendar.errors = googleResult.errors.map(e => e.error);
+        }
+        console.log(`✅ Google Calendar: ${googleResult.synced} events synced from ${googleResult.calendarsProcessed} calendars`);
       } catch (error) {
         console.error('❌ Google Calendar sync failed:', error);
         syncResults.googleCalendar.errors.push(error.message);
