@@ -981,27 +981,6 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                 />
               </div>
 
-              {/* Priority (for task-type events) */}
-              {(formData.eventType === 'jira_task' || formData.eventType === 'github_issue') && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Priority
-                  </label>
-                  <select
-                    name="priority"
-                    value={formData.priority}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  >
-                    {priorityOptions.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
               {/* All Day Toggle */}
               <div className="flex items-center">
                 <input
@@ -1155,37 +1134,7 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                           </div>
                         )}
 
-                        {/* Status Transitions for Existing Issues */}
-                        {formData.existingJiraKey && issueTransitions.length > 0 && (
-                          <div className="mt-3 p-3 bg-white border border-green-200 rounded">
-                            <h5 className="text-xs font-medium text-green-800 mb-2">Available Status Transitions</h5>
-                            <div className="grid grid-cols-1 gap-2">
-                              {issueTransitions.map((transition) => (
-                                <button
-                                  key={transition.id}
-                                  type="button"
-                                  onClick={() => handleStatusTransition(transition.id)}
-                                  disabled={loadingTransitions}
-                                  className="px-3 py-2 text-xs bg-green-100 hover:bg-green-200 border border-green-300 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <span className="font-medium">
-                                      {transition.name}
-                                      {transition.to?.name && (
-                                        <span className="text-green-600 font-normal">
-                                          {' → ' + transition.to.name}
-                                        </span>
-                                      )}
-                                    </span>
-                                    {loadingTransitions && (
-                                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600"></div>
-                                    )}
-                                  </div>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
+                        
                       </div>
                     </div>
                   ) : (
@@ -1720,6 +1669,73 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                       </div>
                     )}
                   </div>
+
+                  {/* Status Transitions - available in view mode for linked Jira tasks */}
+                  {event?.extendedProps?.jiraKey && event?.extendedProps?.account?.id && (
+                    <div className="mt-4 pt-3 border-t border-green-200">
+                      <h5 className="text-sm font-medium text-green-800 mb-2">Change Status</h5>
+                      {issueTransitions.length > 0 ? (
+                        <div className="grid grid-cols-1 gap-2">
+                          {issueTransitions.map((transition) => (
+                            <button
+                              key={transition.id}
+                              type="button"
+                              onClick={() => {
+                                // Store the issue key for status transition
+                                setFormData(prev => ({
+                                  ...prev,
+                                  accountId: event.extendedProps.account.id,
+                                  existingJiraKey: event.extendedProps.jiraKey
+                                }));
+                                handleStatusTransition(transition.id);
+                              }}
+                              disabled={loadingTransitions}
+                              className="px-3 py-2 text-xs bg-green-100 hover:bg-green-200 border border-green-300 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium">
+                                  {transition.name}
+                                  {transition.to?.name && (
+                                    <span className="text-green-600 font-normal">
+                                      {' → ' + transition.to.name}
+                                    </span>
+                                  )}
+                                </span>
+                                {loadingTransitions && (
+                                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600"></div>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            // Load transitions when button is clicked
+                            setFormData(prev => ({
+                              ...prev,
+                              accountId: event.extendedProps.account.id,
+                              existingJiraKey: event.extendedProps.jiraKey
+                            }));
+                            loadIssueTransitions(event.extendedProps.account.id, event.extendedProps.jiraKey);
+                          }}
+                          disabled={loadingTransitions}
+                          className="px-3 py-2 text-xs bg-green-100 hover:bg-green-200 border border-green-300 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                        >
+                          {loadingTransitions ? (
+                            <>
+                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600 mr-2"></div>
+                              Loading transitions...
+                            </>
+                          ) : (
+                            <>
+                              🔄 Load Available Status Changes
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
