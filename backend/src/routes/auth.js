@@ -10,6 +10,7 @@ router.get('/status', (req, res) => {
     endpoints: {
       'GET /google': 'Get Google OAuth URL',
       'GET /google/callback': 'Handle Google OAuth callback',
+      'GET /jira/callback': 'Handle Jira OAuth callback',
       'POST /refresh': 'Refresh JWT token',
       'GET /me': 'Get user profile (requires auth)',
       'PUT /me': 'Update user profile (requires auth)',
@@ -22,6 +23,13 @@ router.get('/status', (req, res) => {
 // Google OAuth routes
 router.get('/google', authController.getGoogleAuthUrl);
 router.get('/google/callback', authController.googleCallback);
+
+// Jira OAuth routes (redirect to main jira controller)
+router.get('/jira/callback', (req, res) => {
+  // Redirect to the actual Jira callback handler
+  const jiraController = require('../controllers/jiraController');
+  return jiraController.callback(req, res);
+});
 
 // Token management
 router.post('/refresh', authController.refreshToken);
