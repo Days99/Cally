@@ -4,6 +4,9 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 require('dotenv').config();
 
+// Import database and models
+const sequelize = require('../config/database');
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -85,10 +88,68 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Cally Backend API running on port ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔒 Allowed origins:`, allowedOrigins);
-}); 
+// Database initialization function
+async function initializeDatabase() {
+  try {
+    console.log('🔄 Checking database connection and tables...');
+    
+    // Test connection
+    await sequelize.authenticate();
+    console.log('✅ Database connection established.');
+    
+    // Sync models (create tables if they don't exist)
+    // Use force: true for new databases, alter: true for existing ones
+    const syncOptions = process.env.NODE_ENV === 'production' 
+      ? { force: false, alter: true } 
+      : { force: false, alter: true };
+    
+    console.log('🔄 Synchronizing database tables...');
+    await sequelize.sync(syncOptions);
+    console.log('✅ Database tables synchronized.');
+    
+    return true;
+  } catch (error) {
+    console.error('❌ Database initialization failed:', error.message);
+    
+    if (error.message.includes('SSL') || error.message.includes('ssl')) {
+      console.log('💡 SSL Error - Make sure NODE_ENV=production and DATABASE_URL is correct');
+    }
+    
+    // If tables don't exist, try force sync
+    if (error.message.includes('does not exist')) {
+      console.log('🔄 Tables don\'t exist, attempting to create them...');
+      try {
+        await sequelize.sync({ force: true });
+        console.log('✅ Database tables created successfully.');
+        return true;
+      } catch (forceError) {
+        console.error('❌ Failed to create tables:', forceError.message);
+        throw forceError;
+      }
+    }
+    
+    throw error;
+  }
+}
+
+// Start server with database initialization
+async function startServer() {
+  try {
+    // Initialize database first
+    await initializeDatabase();
+    
+    // Start the server
+    app.listen(PORT, () => {
+      console.log(`🚀 Cally Backend API running on port ${PORT}`);
+      console.log(`📊 Health check: http://localhost:${PORT}/health`);
+      console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`🔒 Allowed origins:`, allowedOrigins);
+    });
+  } catch (error) {
+    console.error('💥 Failed to start server:', error.message);
+    process.exit(1);
+  }
+}
+
+// Start the application
+startServer(); 
