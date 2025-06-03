@@ -117,30 +117,6 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
     }
   }, [isOpen, accountsLoaded]);
 
-  // Load Jira issues when linking existing issue
-  const loadJiraIssues = useCallback(async () => {
-    if (formData.eventType !== 'jira_task' || 
-        formData.jiraAssociationType !== 'existing' || 
-        !formData.accountId) {
-      setJiraIssues([]);
-      return;
-    }
-
-    try {
-      setLoadingJiraIssues(true);
-      console.log('Loading Jira issues for account:', formData.accountId);
-      const issues = await accountService.getJiraIssues(formData.accountId);
-      console.log('Loaded Jira issues:', issues);
-      setJiraIssues(Array.isArray(issues) ? issues : []);
-    } catch (error) {
-      console.error('Failed to load Jira issues:', error);
-      setError(`Failed to load Jira issues: ${error.message}`);
-      setJiraIssues([]);
-    } finally {
-      setLoadingJiraIssues(false);
-    }
-  }, [formData.eventType, formData.jiraAssociationType, formData.accountId]);
-
   // Load Jira projects (same as Tasks page)
   const loadProjects = useCallback(async (accountId) => {
     if (!accountId) {
@@ -183,57 +159,57 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
       // Helper function to check if a value has meaningful content
       const hasContent = (value) => value && typeof value === 'string' && value.trim().length > 0;
       
-      // Always update form fields based on metadata availability
-      const updates = {};
-      
-      if (metadata.issueTypes.length > 0) {
-        // Check if current value is valid for this project
-        const isValidIssueType = metadata.issueTypes.some(it => it.name === formData.jiraIssueType);
-        if (!isValidIssueType) {
-          // Set first available issue type (no hardcoded defaults)
-          updates.jiraIssueType = metadata.issueTypes[0].name;
+      // Get current form data to validate against metadata
+      setFormData(prev => {
+        const updates = {};
+        
+        if (metadata.issueTypes.length > 0) {
+          // Check if current value is valid for this project
+          const isValidIssueType = metadata.issueTypes.some(it => it.name === prev.jiraIssueType);
+          if (!isValidIssueType) {
+            // Set first available issue type (no hardcoded defaults)
+            updates.jiraIssueType = metadata.issueTypes[0].name;
+          }
+        } else {
+          // Always clear if not available
+          updates.jiraIssueType = '';
         }
-      } else {
-        // Always clear if not available
-        updates.jiraIssueType = '';
-      }
-      
-      if (metadata.priorities.length > 0) {
-        // Check if current value is valid for this project
-        const isValidPriority = metadata.priorities.some(p => p.name === formData.priority);
-        if (!isValidPriority) {
-          // Set middle priority or first available (no hardcoded defaults)
-          const middleIndex = Math.floor(metadata.priorities.length / 2);
-          updates.priority = metadata.priorities[middleIndex].name;
+        
+        if (metadata.priorities.length > 0) {
+          // Check if current value is valid for this project
+          const isValidPriority = metadata.priorities.some(p => p.name === prev.priority);
+          if (!isValidPriority) {
+            // Set middle priority or first available (no hardcoded defaults)
+            const middleIndex = Math.floor(metadata.priorities.length / 2);
+            updates.priority = metadata.priorities[middleIndex].name;
+          }
+        } else {
+          // Always clear if not available
+          updates.priority = '';
         }
-      } else {
-        // Always clear if not available
-        updates.priority = '';
-      }
-      
-      if (metadata.assignableUsers.length > 0) {
-        // Keep existing assignee if it's valid, otherwise clear
-        const isValidAssignee = hasContent(formData.assignee) && metadata.assignableUsers.some(user => 
-          user.accountId === formData.assignee
-        );
-        console.log('Assignee validation:', {
-          currentAssignee: formData.assignee,
-          hasContent: hasContent(formData.assignee),
-          availableUsers: metadata.assignableUsers.map(u => ({ accountId: u.accountId, displayName: u.displayName })),
-          isValidAssignee
-        });
-        if (!isValidAssignee) {
+        
+        if (metadata.assignableUsers.length > 0) {
+          // Keep existing assignee if it's valid, otherwise clear
+          const isValidAssignee = hasContent(prev.assignee) && metadata.assignableUsers.some(user => 
+            user.accountId === prev.assignee
+          );
+          console.log('Assignee validation:', {
+            currentAssignee: prev.assignee,
+            hasContent: hasContent(prev.assignee),
+            availableUsers: metadata.assignableUsers.map(u => ({ accountId: u.accountId, displayName: u.displayName })),
+            isValidAssignee
+          });
+          if (!isValidAssignee) {
+            updates.assignee = '';
+          }
+        } else {
+          // Always clear if not available
           updates.assignee = '';
         }
-      } else {
-        // Always clear if not available
-        updates.assignee = '';
-      }
-      
-      // Apply all updates at once
-      if (Object.keys(updates).length > 0) {
-        setFormData(prev => ({ ...prev, ...updates }));
-      }
+        
+        // Apply all updates at once
+        return Object.keys(updates).length > 0 ? { ...prev, ...updates } : prev;
+      });
       
     } catch (error) {
       console.error('Failed to load project metadata:', error);
@@ -253,7 +229,7 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
     } finally {
       setLoadingMetadata(false);
     }
-  }, [formData.jiraIssueType, formData.priority, formData.assignee]);
+  }, []);
 
   // Load issue transitions for editing existing Jira tasks
   const loadIssueTransitions = useCallback(async (accountId, issueKey) => {
@@ -277,6 +253,28 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
       setLoadingTransitions(false);
     }
   }, []);
+
+  // Load Jira issues when linking existing issue
+  const loadJiraIssues = useCallback(async (accountId) => {
+    if (!accountId) {
+      setJiraIssues([]);
+      return;
+    }
+
+    try {
+      setLoadingJiraIssues(true);
+      console.log('Loading Jira issues for account:', accountId);
+      const issues = await accountService.getJiraIssues(accountId);
+      console.log('Loaded Jira issues:', issues);
+      setJiraIssues(Array.isArray(issues) ? issues : []);
+    } catch (error) {
+      console.error('Failed to load Jira issues:', error);
+      setError(`Failed to load Jira issues: ${error.message}`);
+      setJiraIssues([]);
+    } finally {
+      setLoadingJiraIssues(false);
+    }
+  }, []); // No dependencies to prevent loops
 
   useEffect(() => {
     if (isOpen) {
@@ -333,6 +331,11 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
             const projectKey = metadata.projectKey || event.extendedProps?.jiraKey?.split('-')[0];
             loadProjects(accountId);
             loadProjectMetadata(accountId, projectKey);
+          }
+          
+          // Load Jira issues if we're in existing association mode
+          if (metadata.associationType === 'existing' || event.extendedProps?.jiraKey) {
+            loadJiraIssues(accountId);
           }
           
           // Load transitions if we have an existing issue
@@ -406,10 +409,6 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
   useEffect(() => {
     loadAccounts();
   }, [loadAccounts]);
-
-  useEffect(() => {
-    loadJiraIssues();
-  }, [loadJiraIssues]);
 
   // Set default project when creating new Jira events and projects load
   useEffect(() => {
@@ -499,8 +498,14 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
       // Load projects for the selected account (only for Jira tasks)
       if (value && formData.eventType === 'jira_task') {
         loadProjects(value);
+        
+        // Also load Jira issues if we're in existing association mode
+        if (formData.jiraAssociationType === 'existing') {
+          loadJiraIssues(value);
+        }
       } else {
         setProjects([]);
+        setJiraIssues([]);
       }
       
       // Clear metadata when account changes
@@ -552,6 +557,24 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
       return;
     }
 
+    // Handle Jira association type change - load issues when switching to 'existing'
+    if (name === 'jiraAssociationType') {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value,
+        existingJiraKey: '' // Reset existing key when changing association type
+      }));
+      
+      // Load Jira issues if switching to 'existing' mode
+      if (value === 'existing' && formData.accountId) {
+        loadJiraIssues(formData.accountId);
+      } else {
+        setJiraIssues([]);
+      }
+      setIssueTransitions([]);
+      return;
+    }
+
     // Handle event type change
     if (name === 'eventType') {
       const newValue = type === 'checkbox' ? checked : value;
@@ -568,8 +591,14 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
       // Load projects if switching to Jira task and account is selected
       if (newValue === 'jira_task' && formData.accountId) {
         loadProjects(formData.accountId);
+        
+        // Also load Jira issues if we're in existing association mode
+        if (formData.jiraAssociationType === 'existing') {
+          loadJiraIssues(formData.accountId);
+        }
       } else {
         setProjects([]);
+        setJiraIssues([]);
         setProjectMetadata({
           issueTypes: [],
           priorities: [],

@@ -46,8 +46,8 @@ const AuthCallback = () => {
       
       // Redirect to the appropriate page after a short delay
       setTimeout(() => {
-        if (returnUrl && returnUrl.includes('/account')) {
-          navigate('/account', { replace: true });
+        if (returnUrl && returnUrl.includes('/accounts')) {
+          navigate('/accounts', { replace: true });
         } else {
           navigate('/', { replace: true });
         }
