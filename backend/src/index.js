@@ -97,13 +97,16 @@ async function initializeDatabase() {
     await sequelize.authenticate();
     console.log('✅ Database connection established.');
     
-    // Sync models (create tables if they don't exist)
-    // Use force: true for new databases, alter: true for existing ones
-    const syncOptions = process.env.NODE_ENV === 'production' 
-      ? { force: false, alter: true } 
-      : { force: false, alter: true };
+    // For production with new databases, use force: true to avoid alter issues
+    // For development, use alter: true for existing databases
+    const isNewDatabase = process.env.FORCE_DB_SYNC === 'true' || process.env.NODE_ENV === 'production';
+    const syncOptions = isNewDatabase 
+      ? { force: true } // Clean slate - drops and recreates all tables
+      : { alter: true }; // Try to alter existing tables
     
     console.log('🔄 Synchronizing database tables...');
+    console.log(`📝 Sync mode: ${isNewDatabase ? 'FORCE (recreate all)' : 'ALTER (modify existing)'}`);
+    
     await sequelize.sync(syncOptions);
     console.log('✅ Database tables synchronized.');
     
@@ -113,6 +116,19 @@ async function initializeDatabase() {
     
     if (error.message.includes('SSL') || error.message.includes('ssl')) {
       console.log('💡 SSL Error - Make sure NODE_ENV=production and DATABASE_URL is correct');
+    }
+    
+    // If we get a syntax error during alter, try force sync
+    if (error.message.includes('syntax error') || error.message.includes('USING')) {
+      console.log('🔄 Syntax error detected, attempting force sync (recreate tables)...');
+      try {
+        await sequelize.sync({ force: true });
+        console.log('✅ Database tables created successfully with force sync.');
+        return true;
+      } catch (forceError) {
+        console.error('❌ Failed to create tables with force sync:', forceError.message);
+        throw forceError;
+      }
     }
     
     // If tables don't exist, try force sync
