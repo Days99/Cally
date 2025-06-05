@@ -82,6 +82,7 @@ app.use('/api/jira', require('./routes/jira'));
 app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/integrations', require('./routes/integrations'));
 app.use('/api/contact', require('./routes/contact'));
+app.use('/api/time-manager', require('./routes/timeManager'));
 
 // 404 handler
 app.use('*', (req, res) => {

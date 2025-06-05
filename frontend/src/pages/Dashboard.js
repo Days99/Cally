@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import calendarService from '../services/calendarService';
 import eventService from '../services/eventService';
+import TimeManager from '../components/TimeManager';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -179,6 +180,9 @@ const Dashboard = () => {
           )}
         </div>
       </div>
+
+      {/* TimeManager Widget - New Addition */}
+      <TimeManager />
 
       {/* Integration Status */}
       <div className="card">
