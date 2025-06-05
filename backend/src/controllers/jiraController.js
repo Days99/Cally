@@ -475,18 +475,38 @@ class JiraController {
 
       const health = await jiraService.checkConnectionHealth(userId, accountId);
 
-      const statusCode = health.healthy ? 200 : 
-                        health.status === 'not_connected' ? 404 : 401;
-
-      res.status(statusCode).json({
-        success: health.healthy,
+      res.json({
+        success: true,
         health,
-        message: health.message
+        message: health.healthy ? 'Connection is healthy' : health.message
       });
     } catch (error) {
       console.error('Error checking Jira health:', error);
       res.status(500).json({
         error: 'Failed to check connection health',
+        message: error.message
+      });
+    }
+  }
+
+  // Get accounts that need reconnection
+  async getAccountsNeedingReconnection(req, res) {
+    try {
+      const userId = req.user.id;
+
+      const accounts = await jiraService.getAccountsNeedingReconnection(userId);
+
+      res.json({
+        success: true,
+        accounts,
+        message: accounts.length > 0 
+          ? `${accounts.length} account(s) need reconnection`
+          : 'All Jira accounts are properly configured'
+      });
+    } catch (error) {
+      console.error('Error getting accounts needing reconnection:', error);
+      res.status(500).json({
+        error: 'Failed to get account status',
         message: error.message
       });
     }

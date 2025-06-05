@@ -20,6 +20,9 @@ router.put('/workflow', jiraController.updateWorkflowPreferences);
 router.get('/health', jiraController.checkHealth);
 router.get('/health/:accountId', jiraController.checkHealth);
 
+// Health check routes
+router.get('/accounts/needs-reconnection', jiraController.getAccountsNeedingReconnection);
+
 // Issue management routes
 router.get('/issues', jiraController.getAllIssues);
 router.get('/issues/:accountId', jiraController.getIssues);

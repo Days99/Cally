@@ -114,7 +114,30 @@ class JiraService {
       
       if (token.expiresAt && fiveMinutesFromNow >= token.expiresAt) {
         console.log(`🔄 Jira token expiring soon or expired for user ${userId}, attempting refresh...`);
-        // Try to refresh token
+        
+        // Check if we have a refresh token
+        if (!token.refreshToken) {
+          console.log(`⚠️  No refresh token available for user ${userId}. Token was likely connected before offline_access scope was added.`);
+          
+          // Instead of failing immediately, let's try using the current token
+          // and provide a helpful message for the user
+          console.log(`🔄 Attempting to use existing token for user ${userId} (may be expired)`);
+          
+          // Mark this token as needing reconnection for future reference
+          await token.update({
+            metadata: {
+              ...token.metadata,
+              needsReconnection: true,
+              lastRefreshAttempt: new Date(),
+              refreshFailureReason: 'missing_refresh_token'
+            }
+          });
+          
+          // Try to use the existing token - if it fails, the API call will handle it
+          return token.accessToken;
+        }
+        
+        // Try to refresh token if we have refresh token
         try {
           return await this.refreshAccessToken(userId, accountId);
         } catch (refreshError) {
@@ -256,6 +279,17 @@ class JiraService {
         }
       });
 
+      // If we successfully made the API call, clear any reconnection flags
+      if (account.metadata?.needsReconnection) {
+        await account.update({
+          metadata: {
+            ...account.metadata,
+            needsReconnection: false,
+            lastSuccessfulCall: new Date()
+          }
+        });
+      }
+
       return response.data;
     } catch (error) {
       // Handle authentication errors specifically
@@ -264,13 +298,32 @@ class JiraService {
         throw error; // Re-throw the user-friendly message
       }
       
-      // Handle API errors
-      if (error.response?.status === 401) {
+      // Handle API authentication failures (401/403)
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        // Check if this account needs reconnection due to missing refresh token
+        const whereClause = { userId, provider: 'jira', isActive: true };
+        if (accountId) whereClause.id = accountId;
+        
+        const account = await Token.findOne({ where: whereClause });
+        
+        if (account && !account.refreshToken) {
+          console.log(`🔄 Token expired for account without refresh capability. Account needs to be reconnected with updated permissions.`);
+          
+          // Mark token as needing reconnection
+          await account.update({
+            metadata: {
+              ...account.metadata,
+              needsReconnection: true,
+              lastFailedCall: new Date(),
+              refreshFailureReason: 'token_expired_no_refresh'
+            }
+          });
+          
+          throw new Error('Jira token has expired and cannot be automatically refreshed. Please reconnect your Jira account to restore access.');
+        }
+        
+        // Standard auth error for tokens with refresh capability
         throw new Error('Jira authentication failed. Please reconnect your Jira account.');
-      }
-      
-      if (error.response?.status === 403) {
-        throw new Error('Insufficient permissions to access Jira. Please check your account permissions.');
       }
       
       console.error('Error fetching Jira issues:', error.response?.data || error.message);
@@ -742,8 +795,15 @@ class JiraService {
       if (!token.refreshToken) {
         return {
           healthy: false,
-          status: 'invalid_token',
-          message: 'Token missing refresh capability - reconnection required'
+          status: 'needs_reconnection',
+          message: 'Token missing refresh capability - reconnection recommended for automatic token refresh',
+          canUpgrade: true,
+          account: {
+            id: token.id,
+            name: token.accountName,
+            email: token.accountEmail,
+            connectedAt: token.createdAt
+          }
         };
       }
 
@@ -765,8 +825,8 @@ class JiraService {
         message: 'Jira connection is healthy',
         account: {
           id: token.id,
-          name: token.name,
-          email: token.email,
+          name: token.accountName,
+          email: token.accountEmail,
           lastRefreshedAt: token.lastRefreshedAt,
           expiresAt: token.expiresAt
         }
@@ -778,6 +838,48 @@ class JiraService {
         status: 'error',
         message: 'Error checking connection health'
       };
+    }
+  }
+
+  // Get accounts that need reconnection
+  async getAccountsNeedingReconnection(userId) {
+    try {
+      const accounts = await Token.findAll({
+        where: {
+          userId,
+          provider: 'jira',
+          isActive: true
+        },
+        attributes: ['id', 'accountName', 'accountEmail', 'refreshToken', 'expiresAt', 'metadata', 'createdAt']
+      });
+
+      const needsReconnection = accounts.filter(account => {
+        // Account needs reconnection if:
+        // 1. No refresh token
+        // 2. Marked as needing reconnection in metadata
+        // 3. Token is expired and no refresh token
+        const hasRefreshToken = !!account.refreshToken;
+        const markedForReconnection = account.metadata?.needsReconnection;
+        const isExpired = account.expiresAt && new Date() > account.expiresAt;
+        
+        return !hasRefreshToken || markedForReconnection || (isExpired && !hasRefreshToken);
+      });
+
+      return needsReconnection.map(account => ({
+        id: account.id,
+        name: account.accountName,
+        email: account.accountEmail,
+        connectedAt: account.createdAt,
+        reason: !account.refreshToken 
+          ? 'missing_refresh_token' 
+          : account.metadata?.refreshFailureReason || 'needs_upgrade',
+        message: !account.refreshToken
+          ? 'Account was connected before automatic token refresh was available'
+          : 'Account needs to be reconnected for optimal functionality'
+      }));
+    } catch (error) {
+      console.error('Error getting accounts needing reconnection:', error);
+      return [];
     }
   }
 
