@@ -19,7 +19,7 @@ class JiraService {
     const params = new URLSearchParams({
       audience: 'api.atlassian.com',
       client_id: process.env.JIRA_CLIENT_ID,
-      scope: 'read:me read:jira-user read:jira-work write:jira-work manage:jira-project',
+      scope: 'offline_access read:me read:jira-user read:jira-work write:jira-work manage:jira-project',
       redirect_uri: process.env.JIRA_REDIRECT_URI,
       state: state,
       response_type: 'code',
@@ -36,6 +36,8 @@ class JiraService {
       if (!process.env.JIRA_CLIENT_ID || process.env.JIRA_CLIENT_ID.length !== 32) {
         throw new Error('Invalid JIRA_CLIENT_ID: should be 32 characters');
       }
+
+      // Use form-encoded data for authorization code exchange (OAuth 2.0 standard)
       const params = new URLSearchParams({
         grant_type: 'authorization_code',
         client_id: process.env.JIRA_CLIENT_ID,
@@ -43,19 +45,45 @@ class JiraService {
         code: code,
         redirect_uri: process.env.JIRA_REDIRECT_URI
       });
+
       const response = await axios.post('https://auth.atlassian.com/oauth/token', params, {
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json'
         }
       });
 
-      console.log('Jira token exchange successful');
+      // Validate response format
+      const { access_token, refresh_token, expires_in, scope } = response.data;
+      
+      if (!access_token) {
+        throw new Error('Invalid token response: missing access_token');
+      }
+
+      console.log('Jira token exchange successful', {
+        hasAccessToken: !!access_token,
+        hasRefreshToken: !!refresh_token,
+        expiresIn: expires_in,
+        scope: scope
+      });
+
       return response.data;
     } catch (error) {
       console.error('Error getting Jira tokens:', error.response?.data || error.message);
       if (error.response) {
         console.error('Response status:', error.response.status);
         console.error('Response headers:', error.response.headers);
+      }
+
+      // Handle specific OAuth errors
+      if (error.response?.status === 400) {
+        const errorData = error.response.data;
+        if (errorData.error === 'invalid_grant') {
+          throw new Error('Authorization code is invalid or expired. Please try the authorization flow again.');
+        }
+        if (errorData.error === 'invalid_client') {
+          throw new Error('Invalid client credentials. Please check your Jira OAuth configuration.');
+        }
       }
 
       throw new Error('Failed to exchange authorization code for tokens');
@@ -178,29 +206,45 @@ class JiraService {
         throw new Error('No refresh token found');
       }
 
-      const params = new URLSearchParams({
+      // Use JSON payload as specified in Atlassian documentation
+      const payload = {
         grant_type: 'refresh_token',
         client_id: process.env.JIRA_CLIENT_ID,
         client_secret: process.env.JIRA_CLIENT_SECRET,
         refresh_token: token.refreshToken
-      });
+      };
 
       console.log(`🔄 Refreshing Jira access token for user ${userId}${accountId ? `, account ${accountId}` : ''}`);
 
-      const response = await axios.post('https://auth.atlassian.com/oauth/token', params, {
+      const response = await axios.post('https://auth.atlassian.com/oauth/token', payload, {
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         }
       });
 
-      const { access_token, expires_in, refresh_token } = response.data;
+      const { access_token, refresh_token, expires_in, scope } = response.data;
       
-      // Update token in database
+      // Validate response - access_token is required
+      if (!access_token) {
+        throw new Error('Invalid response: missing access_token');
+      }
+
+      // Update token in database with new values
+      // Important: Always use the new refresh_token if provided (rotating refresh tokens)
       await token.update({
         accessToken: access_token,
-        refreshToken: refresh_token || token.refreshToken,
+        refreshToken: refresh_token || token.refreshToken, // Use new refresh token if provided
         expiresAt: expires_in ? new Date(Date.now() + expires_in * 1000) : null,
-        lastRefreshedAt: new Date()
+        scope: scope || token.scope, // Update scope if provided
+        lastRefreshedAt: new Date(),
+        // Clear any reconnection flags since refresh was successful
+        metadata: {
+          ...token.metadata,
+          needsReconnection: false,
+          lastSuccessfulRefresh: new Date(),
+          refreshFailureReason: null
+        }
       });
 
       console.log(`✅ Successfully refreshed Jira access token for user ${userId}`);
@@ -208,24 +252,64 @@ class JiraService {
     } catch (error) {
       console.error('❌ Error refreshing Jira access token:', error.response?.data || error.message);
       
-      // If we have a token and the refresh failed due to invalid refresh token,
-      // mark the token as inactive so user needs to re-authenticate
-      if (token && (
-        error.response?.status === 400 || 
-        error.response?.status === 401 ||
-        error.message.includes('No refresh token found') ||
-        error.response?.data?.error === 'invalid_grant'
-      )) {
-        console.log(`🔒 Marking Jira token as inactive for user ${userId} due to refresh failure`);
-        await token.update({ 
-          isActive: false,
-          deactivatedAt: new Date(),
-          deactivationReason: 'refresh_token_invalid'
-        });
-        throw new Error('Jira token expired and cannot be refreshed. Please reconnect your Jira account.');
+      // Handle specific error cases based on Atlassian documentation
+      if (token) {
+        let shouldDeactivate = false;
+        let deactivationReason = 'refresh_failed';
+        let userMessage = 'Failed to refresh access token';
+
+        // Check for specific error conditions mentioned in the documentation
+        if (error.response?.status === 403 && error.response?.data?.error === 'invalid_grant') {
+          // 403 Forbidden with invalid_grant error
+          const errorDescription = error.response.data.error_description || '';
+          
+          if (errorDescription.includes('Unknown or invalid refresh token')) {
+            shouldDeactivate = true;
+            deactivationReason = 'invalid_refresh_token';
+            userMessage = 'Jira refresh token is invalid or expired. This can happen if your Atlassian account password was changed or the refresh token has expired. Please reconnect your Jira account.';
+          }
+        } else if (error.response?.status === 400 || error.response?.status === 401) {
+          // General authentication errors
+          shouldDeactivate = true;
+          deactivationReason = 'refresh_token_invalid';
+          userMessage = 'Jira token expired and cannot be refreshed. Please reconnect your Jira account.';
+        } else if (error.message.includes('No refresh token found')) {
+          // No refresh token available
+          deactivationReason = 'missing_refresh_token';
+          userMessage = 'Jira account was connected before automatic token refresh was available. Please reconnect your Jira account to enable automatic token refresh.';
+          
+          // Don't deactivate immediately for missing refresh token, mark for reconnection instead
+          await token.update({
+            metadata: {
+              ...token.metadata,
+              needsReconnection: true,
+              lastRefreshAttempt: new Date(),
+              refreshFailureReason: deactivationReason
+            }
+          });
+          
+          throw new Error(userMessage);
+        }
+
+        // Deactivate token if necessary
+        if (shouldDeactivate) {
+          console.log(`🔒 Marking Jira token as inactive for user ${userId} due to refresh failure: ${deactivationReason}`);
+          await token.update({ 
+            isActive: false,
+            deactivatedAt: new Date(),
+            deactivationReason: deactivationReason,
+            metadata: {
+              ...token.metadata,
+              lastRefreshAttempt: new Date(),
+              refreshFailureReason: deactivationReason
+            }
+          });
+          throw new Error(userMessage);
+        }
       }
       
-      throw new Error('Failed to refresh access token');
+      // Generic error if we couldn't categorize it
+      throw new Error('Failed to refresh access token. Please try again or reconnect your Jira account if the problem persists.');
     }
   }
 
