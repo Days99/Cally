@@ -10,6 +10,7 @@
   "scope": "/",
   "lang": "en",
   "categories": ["productivity", "calendar", "business"],
+  "id": "com.dayz99.cally",
   "icons": [
     {
       "src": "/icons/icon-72x72.png",

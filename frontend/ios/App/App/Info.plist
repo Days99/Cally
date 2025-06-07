@@ -45,5 +45,45 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	
+	<!-- Google OAuth and Custom URL Schemes -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<!-- Custom App URL Scheme -->
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.dayz99.cally</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.dayz99.cally</string>
+			</array>
+		</dict>
+		<!-- Google OAuth URL Scheme (replace with your REVERSED_CLIENT_ID from GoogleService-Info.plist) -->
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>google</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>YOUR_REVERSED_CLIENT_ID_FROM_GOOGLESERVICE_INFO_PLIST</string>
+			</array>
+		</dict>
+	</array>
+	
+	<!-- Allow arbitrary loads for development (remove in production) -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+	
+	<!-- Camera and photo library permissions (if needed) -->
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs access to camera to take photos for events</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs access to photo library to select images for events</string>
+	
+	<!-- Location permissions (if needed for location-based events) -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app needs location access to suggest nearby event locations</string>
 </dict>
 </plist>

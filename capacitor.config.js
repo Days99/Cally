@@ -4,11 +4,11 @@ const getAppId = () => {
   
   switch (env) {
     case 'production':
-      return 'com.cally.app';
+      return 'com.dayz99.cally';
     case 'staging':
-      return 'com.cally.app.staging';
+      return 'com.dayz99.cally.staging';
     default:
-      return 'com.cally.app.dev';
+      return 'com.dayz99.cally.dev';
   }
 };
 
