@@ -1,10 +1,42 @@
+// Get environment-specific configuration
+const getAppId = () => {
+  const env = process.env.REACT_APP_ENV || 'development';
+  
+  switch (env) {
+    case 'production':
+      return 'com.cally.app';
+    case 'staging':
+      return 'com.cally.app.staging';
+    default:
+      return 'com.cally.app.dev';
+  }
+};
+
+const getAppName = () => {
+  const env = process.env.REACT_APP_ENV || 'development';
+  
+  switch (env) {
+    case 'production':
+      return 'Cally';
+    case 'staging':
+      return 'Cally Staging';
+    default:
+      return 'Cally Dev';
+  }
+};
+
 const config = {
-  appId: 'com.cally.app',
-  appName: 'Cally',
+  appId: getAppId(),
+  appName: getAppName(),
   webDir: 'frontend/build',
   server: {
     androidScheme: 'https',
     iosScheme: 'https',
+    // Allow localhost in development
+    ...(process.env.NODE_ENV === 'development' && {
+      url: 'http://localhost:3000',
+      cleartext: true
+    })
   },
   plugins: {
     SplashScreen: {
@@ -24,15 +56,22 @@ const config = {
     App: {
       disallowOverscroll: true,
     },
+    PushNotifications: {
+      presentationOptions: ['badge', 'sound', 'alert'],
+    },
   },
   ios: {
     contentInset: 'automatic',
     allowsLinkPreview: false,
+    // Environment-specific bundle IDs
+    bundleId: getAppId(),
   },
   android: {
-    allowMixedContent: true,
+    allowMixedContent: process.env.NODE_ENV === 'development',
     captureInput: true,
-    webContentsDebuggingEnabled: true,
+    webContentsDebuggingEnabled: process.env.NODE_ENV === 'development',
+    // Environment-specific package names
+    packageName: getAppId(),
   },
 };
 
