@@ -1,0 +1,295 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Mobile-first responsive design */
+@layer base {
+  html {
+    font-size: 16px;
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: #f8fafc;
+    color: #1e293b;
+    line-height: 1.6;
+  }
+
+  /* Mobile app optimizations */
+  .capacitor-app {
+    /* Prevent overscroll/bounce effect */
+    overscroll-behavior: none;
+    /* Improve touch response */
+    touch-action: manipulation;
+    /* Prevent text selection on mobile */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+
+  /* Allow text selection in input fields and content areas */
+  input, textarea, [contenteditable], .selectable {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
+  }
+
+  /* Mobile-friendly scrolling */
+  .scroll-container {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  /* Mobile navigation safe areas */
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .safe-area-left {
+    padding-left: env(safe-area-inset-left);
+  }
+  
+  .safe-area-right {
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+@layer components {
+  /* Mobile-optimized buttons */
+  .btn-mobile {
+    @apply min-h-[44px] min-w-[44px] touch-manipulation;
+  }
+
+  /* Enhanced button variants for mobile */
+  .btn-primary {
+    @apply bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed btn-mobile;
+  }
+
+  .btn-secondary {
+    @apply bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium py-2 px-4 rounded-md transition-colors duration-200 btn-mobile;
+  }
+
+  .btn-ghost {
+    @apply text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 font-medium py-2 px-4 rounded-md transition-colors duration-200 btn-mobile;
+  }
+
+  .btn-icon {
+    @apply p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 btn-mobile;
+  }
+
+  /* Mobile-optimized form inputs */
+  .input-field {
+    @apply w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors duration-200 min-h-[44px];
+  }
+
+  /* Mobile-friendly cards */
+  .card {
+    @apply bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 transition-shadow duration-200;
+  }
+
+  .card-compact {
+    @apply bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 transition-shadow duration-200;
+  }
+
+  /* Mobile alert components */
+  .alert-base {
+    @apply p-4 rounded-lg border-l-4 mb-4;
+  }
+
+  .alert-info {
+    @apply alert-base bg-blue-50 dark:bg-blue-900/20 border-l-blue-400 text-blue-800 dark:text-blue-200;
+  }
+
+  .alert-success {
+    @apply alert-base bg-green-50 dark:bg-green-900/20 border-l-green-400 text-green-800 dark:text-green-200;
+  }
+
+  .alert-warning {
+    @apply alert-base bg-yellow-50 dark:bg-yellow-900/20 border-l-yellow-400 text-yellow-800 dark:text-yellow-200;
+  }
+
+  .alert-error {
+    @apply alert-base bg-red-50 dark:bg-red-900/20 border-l-red-400 text-red-800 dark:text-red-200;
+  }
+
+  /* Mobile keyboard shortcuts display */
+  .kbd {
+    @apply inline-flex items-center px-2 py-1 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-xs font-mono text-gray-700 dark:text-gray-300;
+  }
+
+  /* Mobile-optimized navigation */
+  .nav-link {
+    @apply text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 btn-mobile;
+  }
+
+  .nav-link-active {
+    @apply bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 px-3 py-2 rounded-md text-sm font-medium btn-mobile;
+  }
+}
+
+/* Mobile FullCalendar optimizations */
+.fc {
+  /* Touch-friendly event handling */
+  touch-action: manipulation;
+}
+
+.fc-event {
+  /* Improve touch targets */
+  min-height: 32px !important;
+  cursor: pointer;
+  border-radius: 4px;
+  margin: 1px 0;
+  
+  /* Mobile-friendly hover effects */
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.fc-event:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.fc-event:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Mobile calendar day cells */
+.fc-daygrid-day {
+  /* Improve touch targets */
+  min-height: 80px;
+}
+
+.fc-daygrid-day:hover {
+  background-color: rgba(59, 130, 246, 0.05);
+}
+
+/* Mobile toolbar adjustments */
+.fc-toolbar {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fc-toolbar-chunk {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.fc-button {
+  min-height: 40px !important;
+  min-width: 40px !important;
+  border-radius: 6px !important;
+  font-size: 14px !important;
+}
+
+/* Mobile-specific event multi-selection styles */
+.fc-event-selected {
+  box-shadow: 0 0 0 2px #3b82f6 !important;
+  z-index: 10;
+}
+
+.fc-event-multi-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: #ef4444;
+  color: white;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: bold;
+  z-index: 20;
+}
+
+.fc-event-checkmark {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  color: #22c55e;
+  font-size: 12px;
+  font-weight: bold;
+  z-index: 15;
+}
+
+/* Dark mode optimizations */
+@media (prefers-color-scheme: dark) {
+  .dark body {
+    background-color: #0f172a;
+    color: #e2e8f0;
+  }
+  
+  .dark .fc {
+    --fc-border-color: #374151;
+    --fc-button-text-color: #e5e7eb;
+    --fc-button-bg-color: #374151;
+    --fc-button-border-color: #4b5563;
+    --fc-button-hover-bg-color: #4b5563;
+    --fc-button-active-bg-color: #6b7280;
+    --fc-today-bg-color: rgba(59, 130, 246, 0.1);
+  }
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 640px) {
+  .fc-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .fc-toolbar-chunk {
+    justify-content: center;
+    margin: 4px 0;
+  }
+  
+  .fc-button-group {
+    display: flex;
+    justify-content: center;
+  }
+  
+  .fc-daygrid-day {
+    min-height: 60px;
+  }
+  
+  .fc-event {
+    font-size: 12px;
+    min-height: 28px !important;
+  }
+  
+  /* Stack cards vertically on mobile */
+  .grid-responsive {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+@media (min-width: 641px) {
+  .grid-responsive {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+  }
+}
+
+/* High DPI mobile displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .fc-event {
+    border-width: 0.5px;
+  }
+} 
