@@ -422,8 +422,8 @@ const Calendar = () => {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading calendar...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 dark:border-primary-400 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading calendar...</p>
         </div>
       </div>
     );
@@ -458,8 +458,8 @@ const Calendar = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Unified Calendar</h1>
-          <p className="text-gray-600">Manage events from all your connected services</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Unified Calendar</h1>
+          <p className="text-gray-600 dark:text-gray-400">Manage events from all your connected services</p>
         </div>
         
         <div className="flex items-center space-x-3 mt-4 sm:mt-0">
@@ -467,7 +467,7 @@ const Calendar = () => {
           <select 
             value={eventFilter}
             onChange={(e) => setEventFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="input-field"
           >
             {Object.entries(eventTypes).map(([key, type]) => (
               <option key={key} value={key}>
@@ -479,7 +479,7 @@ const Calendar = () => {
           {/* Create Event Button */}
           <button
             onClick={() => handleCreateEvent()}
-            className="btn-secondary flex items-center"
+            className="btn-primary flex items-center whitespace-nowrap"
           >
             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -493,7 +493,7 @@ const Calendar = () => {
               onClick={handleSync}
               disabled={syncing}
               className={`btn-primary flex items-center relative ${
-                syncing ? 'bg-blue-400 cursor-not-allowed' : 'hover:bg-blue-700'
+                syncing ? 'opacity-75 cursor-not-allowed' : ''
               }`}
               title={
                 syncing 
@@ -520,7 +520,7 @@ const Calendar = () => {
             </button>
             
             {/* Sync status tooltip */}
-            <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
+            <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 bg-gray-800 dark:bg-gray-700 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
               Debug: Sync always enabled for testing
             </div>
           </div>
@@ -530,62 +530,62 @@ const Calendar = () => {
       {/* Event Statistics */}
       {eventStats && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="card-compact">
             <div className="flex items-center">
-              <div className="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center">
-                <span className="text-primary-600 text-sm">📅</span>
+              <div className="w-8 h-8 bg-primary-100 dark:bg-primary-900/20 rounded-lg flex items-center justify-center">
+                <span className="text-primary-600 dark:text-primary-400 text-sm">📅</span>
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-gray-900">Total</p>
-                <p className="text-lg font-semibold text-gray-900">{eventStats.total}</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Total</p>
+                <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{eventStats.total}</p>
               </div>
             </div>
           </div>
           
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="card-compact">
             <div className="flex items-center">
-              <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <span className="text-yellow-600 text-sm">🕐</span>
+              <div className="w-8 h-8 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg flex items-center justify-center">
+                <span className="text-yellow-600 dark:text-yellow-400 text-sm">🕐</span>
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-gray-900">Today</p>
-                <p className="text-lg font-semibold text-gray-900">{eventStats.today}</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Today</p>
+                <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{eventStats.today}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="card-compact">
             <div className="flex items-center">
-              <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                <span className="text-green-600 text-sm">⏰</span>
+              <div className="w-8 h-8 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center">
+                <span className="text-green-600 dark:text-green-400 text-sm">⏰</span>
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-gray-900">Upcoming</p>
-                <p className="text-lg font-semibold text-gray-900">{eventStats.upcoming}</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Upcoming</p>
+                <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{eventStats.upcoming}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="card-compact">
             <div className="flex items-center">
-              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                <span className="text-blue-600 text-sm">📅</span>
+              <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
+                <span className="text-blue-600 dark:text-blue-400 text-sm">📅</span>
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-gray-900">Google</p>
-                <p className="text-lg font-semibold text-gray-900">{eventStats.byType?.google_calendar || 0}</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Google</p>
+                <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{eventStats.byType?.google_calendar || 0}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="card-compact">
             <div className="flex items-center">
-              <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                <span className="text-green-600 text-sm">📋</span>
+              <div className="w-8 h-8 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center">
+                <span className="text-green-600 dark:text-green-400 text-sm">📋</span>
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-gray-900">Jira</p>
-                <p className="text-lg font-semibold text-gray-900">{eventStats.byType?.jira_task || 0}</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Jira</p>
+                <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{eventStats.byType?.jira_task || 0}</p>
               </div>
             </div>
           </div>
@@ -594,27 +594,27 @@ const Calendar = () => {
 
       {/* Connected Accounts Status */}
       {Array.isArray(accounts) && accounts.length > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+        <div className="alert-info">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <div className="w-3 h-3 bg-green-400 rounded-full mr-3"></div>
               <div>
-                <p className="text-sm font-medium text-blue-900">
+                <p className="text-sm font-medium text-primary-900 dark:text-primary-200">
                   Connected Services ({accounts.length})
                 </p>
                 <div className="flex items-center space-x-4 mt-1">
                   {accounts.filter(acc => acc.provider === 'google').length > 0 && (
-                    <span className="text-xs text-blue-700">
+                    <span className="text-xs text-primary-700 dark:text-primary-300">
                       📅 Google Calendar ({accounts.filter(acc => acc.provider === 'google').length})
                     </span>
                   )}
                   {accounts.filter(acc => acc.provider === 'jira').length > 0 && (
-                    <span className="text-xs text-blue-700">
+                    <span className="text-xs text-primary-700 dark:text-primary-300">
                       📋 Jira ({accounts.filter(acc => acc.provider === 'jira').length})
                     </span>
                   )}
                   {accounts.filter(acc => acc.provider === 'github').length > 0 && (
-                    <span className="text-xs text-blue-700">
+                    <span className="text-xs text-primary-700 dark:text-primary-300">
                       🐙 GitHub ({accounts.filter(acc => acc.provider === 'github').length})
                     </span>
                   )}
@@ -627,22 +627,22 @@ const Calendar = () => {
 
       {/* Success Message */}
       {syncSuccess && (
-        <div className="bg-green-50 border border-green-200 rounded-md p-4">
+        <div className="alert-success">
           <div className="flex">
             <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+              <svg className="h-5 w-5 text-success-400 dark:text-success-300" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
             </div>
             <div className="ml-3">
-              <p className="text-sm text-green-800">
+              <p className="text-sm text-success-800 dark:text-success-200">
                 🎉 Unified sync completed successfully! Your calendar is now up to date with Google Calendar and Jira tasks.
               </p>
             </div>
             <div className="ml-auto pl-3">
               <button
                 onClick={() => setSyncSuccess(false)}
-                className="text-green-400 hover:text-green-600"
+                className="text-success-400 dark:text-success-300 hover:text-success-600 dark:hover:text-success-200 btn-icon"
               >
                 <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -655,20 +655,20 @@ const Calendar = () => {
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+        <div className="alert-error">
           <div className="flex">
             <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+              <svg className="h-5 w-5 text-error-400 dark:text-error-300" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
               </svg>
             </div>
             <div className="ml-3">
-              <p className="text-sm text-red-800">{error}</p>
+              <p className="text-sm text-error-800 dark:text-error-200">{error}</p>
             </div>
             <div className="ml-auto pl-3">
               <button
                 onClick={() => setError(null)}
-                className="text-red-400 hover:text-red-600"
+                className="text-error-400 dark:text-error-300 hover:text-error-600 dark:hover:text-error-200 btn-icon"
               >
                 <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -712,27 +712,27 @@ const Calendar = () => {
       </div>
 
       {/* Instructions */}
-      <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
-        <h3 className="text-sm font-medium text-gray-900 mb-2">Calendar Instructions</h3>
+      <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md p-4">
+        <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Calendar Instructions</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <h4 className="text-xs font-semibold text-gray-700 mb-1">Event Management</h4>
-            <ul className="text-sm text-gray-600 space-y-1">
+            <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Event Management</h4>
+            <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
               <li>• Click on events to view, edit, or delete them</li>
               <li>• Click and drag to select time slots and create new events</li>
               <li>• Drag events to move them to different times/dates</li>
               <li>• Drag event edges to resize duration</li>
-              <li>• Use <kbd className="px-1 py-0.5 text-xs bg-gray-100 border rounded">Ctrl+N</kbd> to create new events</li>
+              <li>• Use <kbd className="px-1 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 border rounded">Ctrl+N</kbd> to create new events</li>
               <li>• Filter events by type using the dropdown above</li>
             </ul>
           </div>
           <div>
-            <h4 className="text-xs font-semibold text-gray-700 mb-1">Event Types</h4>
-            <ul className="text-sm text-gray-600 space-y-1">
-              <li>• 📅 <span className="text-blue-600">Google Calendar</span> events (blue)</li>
-              <li>• 📋 <span className="text-green-600">Jira Tasks</span> (green)</li>
-              <li>• 🐙 <span className="text-purple-600">GitHub Issues</span> (purple)</li>
-              <li>• 📆 <span className="text-gray-600">Manual Events</span> (gray)</li>
+            <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Event Types</h4>
+            <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+              <li>• 📅 <span className="text-blue-600 dark:text-blue-400">Google Calendar</span> events (blue)</li>
+              <li>• 📋 <span className="text-green-600 dark:text-green-400">Jira Tasks</span> (green)</li>
+              <li>• 🐙 <span className="text-purple-600 dark:text-purple-400">GitHub Issues</span> (purple)</li>
+              <li>• 📆 <span className="text-gray-600 dark:text-gray-400">Manual Events</span> (gray)</li>
               <li>• Use sync button to fetch latest from connected services</li>
             </ul>
           </div>

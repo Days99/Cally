@@ -1,12 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useNotifications } from '../components/NotificationSystem';
 import calendarService from '../services/calendarService';
 import eventService from '../services/eventService';
 import TimeManager from '../components/TimeManager';
+import { 
+  SkeletonDashboard, 
+  SkeletonEventList, 
+  LoadingButton,
+  Spinner 
+} from '../components/LoadingStates';
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const { showSuccess, showError, showInfo } = useNotifications();
   const [syncStatus, setSyncStatus] = useState(null);
   const [recentEvents, setRecentEvents] = useState([]);
   const [eventStats, setEventStats] = useState(null);
@@ -36,6 +44,7 @@ const Dashboard = () => {
       setEventStats(statsData);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
+      showError('Failed to load dashboard data. Please try refreshing the page.');
     } finally {
       setLoading(false);
     }
@@ -44,6 +53,7 @@ const Dashboard = () => {
   const handleUnifiedSync = async () => {
     try {
       setSyncing(true);
+      showInfo('Starting unified sync...', { duration: 3000 });
       console.log('🔄 Starting unified sync from Dashboard...');
       
       // Use unified sync that handles both Google Calendar and Jira
@@ -58,10 +68,25 @@ const Dashboard = () => {
       // Reload dashboard data
       await loadDashboardData();
       
+      showSuccess('Sync completed successfully!', {
+        title: 'Calendar & Tasks Updated',
+        duration: 4000
+      });
+      
       console.log('🎉 Dashboard unified sync completed successfully');
       
     } catch (error) {
       console.error('❌ Error during dashboard sync:', error);
+      showError('Sync failed. Please try again.', {
+        title: 'Sync Error',
+        actions: [
+          {
+            label: 'Retry',
+            onClick: () => handleUnifiedSync(),
+            primary: true
+          }
+        ]
+      });
     } finally {
       setSyncing(false);
     }
@@ -87,170 +112,174 @@ const Dashboard = () => {
     return date.toLocaleDateString();
   };
 
+  if (loading) {
+    return <SkeletonDashboard />;
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Welcome Header */}
-      <div className="bg-gradient-to-r from-primary-600 to-primary-700 rounded-lg p-6 text-white">
+      <div className="bg-gradient-to-r from-primary-600 to-primary-700 dark:from-primary-500 dark:to-primary-600 rounded-xl p-6 text-white shadow-colored animate-slide-up">
         <div className="flex items-center mb-4">
-          <img 
-            src="/cally_sunrise_calendar_icon.svg" 
-            alt="Cally Icon" 
-            className="h-12 w-12 mr-4"
-          />
-          <h1 className="text-3xl font-bold">
-            Welcome back, {user?.name || 'User'}! 👋
-          </h1>
+          <div className="animate-float">
+            <img 
+              src="/cally_sunrise_calendar_icon.svg" 
+              alt="Cally Icon" 
+              className="h-12 w-12 mr-4 drop-shadow-lg"
+            />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold">
+              Welcome back, {user?.name || 'User'}! 👋
+            </h1>
+            <p className="text-primary-100 mt-1">
+              Your unified calendar and task management dashboard
+            </p>
+          </div>
         </div>
-        <p className="text-primary-100">
-          Your unified calendar and task management dashboard
-        </p>
       </div>
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Google Calendar Status */}
-        <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Google Calendar</h3>
-            <div className="w-3 h-3 bg-green-400 rounded-full"></div>
+        <div className="card-interactive animate-slide-up" style={{ animationDelay: '0.1s' }}>
+          <div className="card-header">
+            <div className="flex items-center space-x-2">
+              <span className="text-lg">📅</span>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Google Calendar</h3>
+            </div>
+            <div className="status-online animate-pulse" />
           </div>
-          {loading ? (
-            <div className="animate-pulse">
-              <div className="h-4 bg-gray-200 rounded mb-2"></div>
-              <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+          <div>
+            <p className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-1">
+              {syncStatus?.totalEvents || 0}
+            </p>
+            <p className="text-gray-600 dark:text-gray-400 mb-3">events synced</p>
+            <div className="flex items-center text-sm">
+              <span className="text-gray-500 dark:text-gray-400">Last sync:</span>
+              <span className="ml-2 badge-gray">
+                {formatLastSync(syncStatus?.lastSyncAt)}
+              </span>
             </div>
-          ) : (
-            <div>
-              <p className="text-2xl font-bold text-gray-900">
-                {syncStatus?.totalEvents || 0}
-              </p>
-              <p className="text-gray-600">events synced</p>
-              <p className="text-sm text-gray-500 mt-2">
-                Last sync: {formatLastSync(syncStatus?.lastSyncAt)}
-              </p>
-            </div>
-          )}
+          </div>
         </div>
 
-        {/* Tasks (Placeholder) */}
-        <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Jira Tasks</h3>
-            <div className={`w-3 h-3 rounded-full ${eventStats?.byType?.jira_task > 0 ? 'bg-green-400' : 'bg-gray-300'}`}></div>
+        {/* Jira Tasks */}
+        <div className="card-interactive animate-slide-up" style={{ animationDelay: '0.2s' }}>
+          <div className="card-header">
+            <div className="flex items-center space-x-2">
+              <span className="text-lg">📋</span>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Jira Tasks</h3>
+            </div>
+            <div className={`${eventStats?.byType?.jira_task > 0 ? 'status-online' : 'status-offline'} animate-pulse`} />
           </div>
-          {loading ? (
-            <div className="animate-pulse">
-              <div className="h-4 bg-gray-200 rounded mb-2"></div>
-              <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+          <div>
+            <p className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-1">
+              {eventStats?.byType?.jira_task || 0}
+            </p>
+            <p className="text-gray-600 dark:text-gray-400 mb-3">active tasks</p>
+            <div className="badge-primary">
+              Connected to Jira workspace
             </div>
-          ) : (
-            <div>
-              <p className="text-2xl font-bold text-gray-900">
-                {eventStats?.byType?.jira_task || 0}
-              </p>
-              <p className="text-gray-600">active tasks</p>
-              <p className="text-sm text-gray-500 mt-2">
-                Connected to Jira workspace
-              </p>
-            </div>
-          )}
+          </div>
         </div>
 
         {/* Manual Events */}
-        <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Manual Events</h3>
-            <div className={`w-3 h-3 rounded-full ${eventStats?.byType?.manual > 0 ? 'bg-blue-400' : 'bg-gray-300'}`}></div>
+        <div className="card-interactive animate-slide-up" style={{ animationDelay: '0.3s' }}>
+          <div className="card-header">
+            <div className="flex items-center space-x-2">
+              <span className="text-lg">✨</span>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Manual Events</h3>
+            </div>
+            <div className={`${eventStats?.byType?.manual > 0 ? 'status-online' : 'status-offline'} animate-pulse`} />
           </div>
-          {loading ? (
-            <div className="animate-pulse">
-              <div className="h-4 bg-gray-200 rounded mb-2"></div>
-              <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+          <div>
+            <p className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-1">
+              {eventStats?.byType?.manual || 0}
+            </p>
+            <p className="text-gray-600 dark:text-gray-400 mb-3">custom events</p>
+            <div className="badge-gray">
+              Created manually
             </div>
-          ) : (
-            <div>
-              <p className="text-2xl font-bold text-gray-900">
-                {eventStats?.byType?.manual || 0}
-              </p>
-              <p className="text-gray-600">custom events</p>
-              <p className="text-sm text-gray-500 mt-2">
-                Created manually
-              </p>
-            </div>
-          )}
+          </div>
         </div>
       </div>
 
-      {/* TimeManager Widget - New Addition */}
-      <TimeManager />
+      {/* TimeManager Widget */}
+      <div className="animate-slide-up" style={{ animationDelay: '0.4s' }}>
+        <TimeManager />
+      </div>
 
       {/* Integration Status */}
-      <div className="card">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">📊 Integration Status</h3>
+      <div className="card animate-slide-up" style={{ animationDelay: '0.5s' }}>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center">
+          <span className="mr-2">📊</span>
+          Integration Status
+        </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="alert-info animate-slide-in-left">
             <div className="flex items-center justify-between">
               <div>
-                <h4 className="font-medium text-blue-900">Google Calendar</h4>
-                <p className="text-sm text-blue-700">
+                <h4 className="font-medium">Google Calendar</h4>
+                <p className="text-sm opacity-90">
                   Phase 1-3: ✓ Connected & Active
                 </p>
               </div>
-              <div className="text-blue-600 text-2xl">📅</div>
+              <div className="text-2xl">📅</div>
             </div>
           </div>
           
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="alert-success animate-slide-in-right">
             <div className="flex items-center justify-between">
               <div>
-                <h4 className="font-medium text-green-900">Jira Integration</h4>
-                <p className="text-sm text-green-700">
+                <h4 className="font-medium">Jira Integration</h4>
+                <p className="text-sm opacity-90">
                   Phase 4-6: ✓ Connected & Active with Dynamic Transitions
                 </p>
               </div>
-              <div className="text-green-600 text-2xl">📋</div>
+              <div className="text-2xl">📋</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Recent Events */}
+      {/* Recent Events and Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Upcoming Events</h3>
+        {/* Recent Events */}
+        <div className="card animate-slide-up" style={{ animationDelay: '0.6s' }}>
+          <div className="card-header">
+            <div className="flex items-center space-x-2">
+              <span className="text-lg">🗓️</span>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Upcoming Events</h3>
+            </div>
             <Link 
               to="/calendar" 
-              className="text-primary-600 hover:text-primary-500 text-sm font-medium"
+              className="text-primary-600 dark:text-primary-400 hover:text-primary-500 text-sm font-medium transition-colors duration-200"
             >
               View All →
             </Link>
           </div>
           
-          {loading ? (
+          {recentEvents.length > 0 ? (
             <div className="space-y-3">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="animate-pulse">
-                  <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                  <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                </div>
-              ))}
-            </div>
-          ) : recentEvents.length > 0 ? (
-            <div className="space-y-3">
-              {recentEvents.slice(0, 5).map((event) => (
-                <div key={event.id} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-md">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+              {recentEvents.slice(0, 5).map((event, index) => (
+                <div 
+                  key={event.id} 
+                  className="flex items-start space-x-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 animate-slide-in-left"
+                  style={{ animationDelay: `${index * 0.1}s` }}
+                >
+                  <div className="w-3 h-3 bg-primary-500 rounded-full mt-2 flex-shrink-0 animate-pulse" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
                       {event.title}
                     </p>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
                       {formatEventTime(event.startDateTime, event.isAllDay)}
                     </p>
                     {event.location && (
-                      <p className="text-xs text-gray-400 truncate">
-                        📍 {event.location}
+                      <p className="text-xs text-gray-400 dark:text-gray-500 truncate flex items-center mt-1">
+                        <span className="mr-1">📍</span>
+                        {event.location}
                       </p>
                     )}
                   </div>
@@ -258,108 +287,85 @@ const Dashboard = () => {
               ))}
             </div>
           ) : (
-            <div className="text-center py-6">
-              <p className="text-gray-500">No upcoming events</p>
+            <div className="text-center py-8">
+              <div className="text-4xl mb-3">📅</div>
+              <p className="text-gray-500 dark:text-gray-400 mb-3">No upcoming events</p>
               <Link 
                 to="/calendar"
-                className="text-primary-600 hover:text-primary-500 text-sm font-medium mt-2 inline-block"
+                className="btn-primary"
               >
-                Sync your calendar →
+                View Calendar
               </Link>
             </div>
           )}
         </div>
 
         {/* Quick Actions */}
-        <div className="card">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+        <div className="card animate-slide-up" style={{ animationDelay: '0.7s' }}>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center">
+            <span className="mr-2">⚡</span>
+            Quick Actions
+          </h3>
           <div className="space-y-3">
             <Link 
               to="/calendar"
-              className="flex items-center p-3 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
+              className="flex items-center p-4 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-xl hover:from-blue-100 hover:to-blue-200 dark:hover:from-blue-800/30 dark:hover:to-blue-700/30 transition-all duration-200 transform hover:scale-105 group"
             >
-              <div className="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center mr-3 flex-shrink-0">
-                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
+              <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center mr-4 flex-shrink-0 group-hover:shadow-lg transition-all duration-200">
+                <span className="text-xl">📅</span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900">View Calendar</p>
-                <p className="text-sm text-gray-600">Browse your events</p>
+                <p className="font-medium text-gray-900 dark:text-gray-100">View Calendar</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Browse your events and schedule</p>
               </div>
             </Link>
 
-            <button 
+            <LoadingButton
               onClick={handleUnifiedSync}
-              disabled={syncing}
-              className={`w-full flex items-center p-3 rounded-md transition-colors text-left ${
-                syncing 
-                  ? 'bg-green-100 cursor-not-allowed' 
-                  : 'bg-green-50 hover:bg-green-100'
-              }`}
+              loading={syncing}
+              loadingText="Syncing..."
+              className="w-full flex items-center p-4 bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-xl hover:from-green-100 hover:to-green-200 dark:hover:from-green-800/30 dark:hover:to-green-700/30 transition-all duration-200 transform hover:scale-105 group text-left"
             >
-              <div className="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center mr-3 flex-shrink-0">
+              <div className="w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center mr-4 flex-shrink-0 group-hover:shadow-lg transition-all duration-200">
                 {syncing ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <Spinner size="sm" color="white" />
                 ) : (
-                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
+                  <span className="text-xl">🔄</span>
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900">
-                  {syncing ? 'Syncing...' : 'Sync All Sources'}
+                <p className="font-medium text-gray-900 dark:text-gray-100">
+                  {syncing ? 'Syncing All Sources...' : 'Sync All Sources'}
                 </p>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
                   {syncing ? 'Updating calendar and tasks...' : 'Refresh Google Calendar & Jira tasks'}
                 </p>
               </div>
-            </button>
+            </LoadingButton>
 
             <Link 
-              to="/settings"
-              className="flex items-center p-3 bg-gray-50 rounded-md hover:bg-gray-100 transition-colors"
+              to="/tasks"
+              className="flex items-center p-4 bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-xl hover:from-orange-100 hover:to-orange-200 dark:hover:from-orange-800/30 dark:hover:to-orange-700/30 transition-all duration-200 transform hover:scale-105 group"
             >
-              <div className="w-8 h-8 bg-gray-500 rounded-md flex items-center justify-center mr-3 flex-shrink-0">
-                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
+              <div className="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center mr-4 flex-shrink-0 group-hover:shadow-lg transition-all duration-200">
+                <span className="text-xl">✅</span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900">Settings</p>
-                <p className="text-sm text-gray-600">Manage integrations</p>
+                <p className="font-medium text-gray-900 dark:text-gray-100">View Tasks</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Manage Jira issues & tasks</p>
               </div>
             </Link>
 
             <Link 
               to="/accounts"
-              className="flex items-center p-3 bg-purple-50 rounded-md hover:bg-purple-100 transition-colors"
+              className="flex items-center p-4 bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 rounded-xl hover:from-purple-100 hover:to-purple-200 dark:hover:from-purple-800/30 dark:hover:to-purple-700/30 transition-all duration-200 transform hover:scale-105 group"
             >
-              <div className="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center mr-3 flex-shrink-0">
-                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
+              <div className="w-10 h-10 bg-purple-500 rounded-xl flex items-center justify-center mr-4 flex-shrink-0 group-hover:shadow-lg transition-all duration-200">
+                <span className="text-xl">👥</span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900">Manage Accounts</p>
-                <p className="text-sm text-gray-600">Add or configure integrations</p>
-              </div>
-            </Link>
-
-            <Link 
-              to="/tasks"
-              className="flex items-center p-3 bg-orange-50 rounded-md hover:bg-orange-100 transition-colors"
-            >
-              <div className="w-8 h-8 bg-orange-500 rounded-md flex items-center justify-center mr-3 flex-shrink-0">
-                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                </svg>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900">View Tasks</p>
-                <p className="text-sm text-gray-600">Manage Jira issues & tasks</p>
+                <p className="font-medium text-gray-900 dark:text-gray-100">Accounts</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Manage integrations & connected accounts</p>
               </div>
             </Link>
           </div>
@@ -367,46 +373,58 @@ const Dashboard = () => {
       </div>
 
       {/* Development Status */}
-      <div className="card">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Development Progress</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-green-50 border border-green-200 rounded-md p-4">
-            <h4 className="font-medium text-green-900 mb-2">✅ Completed (Phases 1-6)</h4>
-            <ul className="text-sm text-green-700 space-y-1">
-              <li>• Google OAuth Authentication</li>
-              <li>• Database Schema & Models</li>
-              <li>• Google Calendar Integration</li>
-              <li>• Calendar UI with FullCalendar</li>
-              <li>• Event Sync & Management</li>
-              <li>• Multi-Account Support</li>
-              <li>• Jira OAuth Integration</li>
-              <li>• Unified Event Creation System</li>
-              <li>• Dynamic Jira Workflow Transitions</li>
-              <li>• Task Management Interface</li>
-              <li>• Real-time Status Updates</li>
-              <li>• Auto-cleanup on Task Completion</li>
+      <div className="card animate-slide-up" style={{ animationDelay: '0.8s' }}>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-6 flex items-center">
+          <span className="mr-2">🚀</span>
+          Development Progress
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="alert-success">
+            <h4 className="font-semibold mb-3 flex items-center">
+              <span className="mr-2">✅</span>
+              Completed (Phases 1-7)
+            </h4>
+            <ul className="text-sm space-y-2 opacity-90">
+              <li className="flex items-start"><span className="mr-2 text-success-500">•</span>Google OAuth Authentication</li>
+              <li className="flex items-start"><span className="mr-2 text-success-500">•</span>Database Schema & Models</li>
+              <li className="flex items-start"><span className="mr-2 text-success-500">•</span>Google Calendar Integration</li>
+              <li className="flex items-start"><span className="mr-2 text-success-500">•</span>Calendar UI with FullCalendar</li>
+              <li className="flex items-start"><span className="mr-2 text-success-500">•</span>Event Sync & Management</li>
+              <li className="flex items-start"><span className="mr-2 text-success-500">•</span>Multi-Account Support</li>
+              <li className="flex items-start"><span className="mr-2 text-success-500">•</span>Jira OAuth Integration</li>
+              <li className="flex items-start"><span className="mr-2 text-success-500">•</span>Unified Event Creation System</li>
+              <li className="flex items-start"><span className="mr-2 text-success-500">•</span>Dynamic Jira Workflow Transitions</li>
+              <li className="flex items-start"><span className="mr-2 text-success-500">•</span>Task Management Interface</li>
+              <li className="flex items-start"><span className="mr-2 text-success-500">•</span>Real-time Status Updates</li>
+              <li className="flex items-start"><span className="mr-2 text-success-500">•</span>TimeManager System</li>
             </ul>
           </div>
           
-          <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-            <h4 className="font-medium text-blue-900 mb-2">🔄 Phase 7: GitHub Integration</h4>
-            <ul className="text-sm text-blue-700 space-y-1">
-              <li>• GitHub OAuth Setup</li>
-              <li>• Issues & PR Fetching</li>
-              <li>• Commit Activity Tracking</li>
-              <li>• Repository Management</li>
-              <li>• GitHub Event Creation</li>
+          <div className="alert-info">
+            <h4 className="font-semibold mb-3 flex items-center">
+              <span className="mr-2">🎨</span>
+              Current: Enhanced UI & UX (Phase 8)
+            </h4>
+            <ul className="text-sm space-y-2 opacity-90">
+              <li className="flex items-start"><span className="mr-2 text-primary-500">•</span>Dark Mode Support</li>
+              <li className="flex items-start"><span className="mr-2 text-primary-500">•</span>Enhanced Animations</li>
+              <li className="flex items-start"><span className="mr-2 text-primary-500">•</span>Improved Loading States</li>
+              <li className="flex items-start"><span className="mr-2 text-primary-500">•</span>Advanced Notification System</li>
+              <li className="flex items-start"><span className="mr-2 text-primary-500">•</span>Better Visual Hierarchy</li>
+              <li className="flex items-start"><span className="mr-2 text-primary-500">•</span>Enhanced Form Designs</li>
             </ul>
           </div>
           
-          <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
-            <h4 className="font-medium text-gray-900 mb-2">📋 Future Phases</h4>
-            <ul className="text-sm text-gray-700 space-y-1">
-              <li>• Enhanced UI & UX (Phase 8)</li>
-              <li>• Advanced Drag & Drop (Phase 9)</li>
-              <li>• Performance Optimization (Phase 10)</li>
-              <li>• Mobile Optimization (Phase 11)</li>
-              <li>• Testing & Deployment (Phase 12)</li>
+          <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+            <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center">
+              <span className="mr-2">📋</span>
+              Upcoming Phases
+            </h4>
+            <ul className="text-sm text-gray-700 dark:text-gray-300 space-y-2">
+              <li className="flex items-start"><span className="mr-2 text-gray-400">•</span>Advanced Drag & Drop (Phase 9)</li>
+              <li className="flex items-start"><span className="mr-2 text-gray-400">•</span>Mobile Optimization (Phase 10)</li>
+              <li className="flex items-start"><span className="mr-2 text-gray-400">•</span>Performance Optimization (Phase 11)</li>
+              <li className="flex items-start"><span className="mr-2 text-gray-400">•</span>GitHub Integration</li>
             </ul>
           </div>
         </div>

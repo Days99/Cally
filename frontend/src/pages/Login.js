@@ -69,7 +69,7 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
       <div className="card max-w-md w-full">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
@@ -78,26 +78,26 @@ const Login = () => {
               alt="Cally Icon" 
               className="h-12 w-12 mr-3"
             />
-            <h1 className="text-3xl font-bold text-primary-600">Cally</h1>
+            <h1 className="text-3xl font-bold text-primary-600 dark:text-primary-400">Cally</h1>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
             Welcome Back
           </h2>
-          <p className="text-gray-600">
+          <p className="text-gray-600 dark:text-gray-400">
             Sign in to access your unified calendar and task management
           </p>
         </div>
 
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
+          <div className="alert-error mb-6">
             <div className="flex">
               <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <svg className="h-5 w-5 text-error-400 dark:text-error-300" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                 </svg>
               </div>
               <div className="ml-3">
-                <p className="text-sm text-red-800">{error}</p>
+                <p className="text-sm text-error-800 dark:text-error-200">{error}</p>
               </div>
             </div>
           </div>
@@ -113,23 +113,23 @@ const Login = () => {
                 type="checkbox"
                 checked={privacyAccepted}
                 onChange={(e) => handlePrivacyToggle(e.target.checked)}
-                className="focus:ring-primary-500 h-4 w-4 text-primary-600 border-gray-300 rounded"
+                className="focus:ring-primary-500 h-4 w-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
               />
             </div>
             <div className="ml-3 text-sm">
-              <label htmlFor="privacy-agreement" className="text-gray-700">
+              <label htmlFor="privacy-agreement" className="text-gray-700 dark:text-gray-300">
                 I agree to the{' '}
                 <button
                   type="button"
                   onClick={() => setShowPrivacyModal(true)}
-                  className="text-primary-600 hover:text-primary-500 underline font-medium"
+                  className="text-primary-600 dark:text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 underline font-medium"
                 >
                   Privacy Policy
                 </button>
                 {' '}and{' '}
                 <Link 
                   to="/terms" 
-                  className="text-primary-600 hover:text-primary-500 underline font-medium"
+                  className="text-primary-600 dark:text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 underline font-medium"
                 >
                   Terms of Service
                 </Link>
@@ -138,7 +138,7 @@ const Login = () => {
             </div>
           </div>
           {!privacyAccepted && (
-            <p className="mt-2 text-xs text-gray-500">
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
               You must accept our privacy policy to create an account and use Cally
             </p>
           )}
@@ -147,12 +147,12 @@ const Login = () => {
         <button 
           onClick={handleGoogleLogin}
           disabled={loading || !privacyAccepted}
-          className={`w-full flex items-center justify-center px-4 py-3 border border-gray-300 rounded-md shadow-sm bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200 ${
+          className={`w-full flex items-center justify-center px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 dark:focus:ring-primary-400 dark:focus:ring-offset-gray-900 transition-colors duration-200 ${
             !privacyAccepted ? 'opacity-50 cursor-not-allowed' : 'disabled:opacity-50 disabled:cursor-not-allowed'
           }`}
         >
           {loading ? (
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600"></div>
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600 dark:border-gray-300"></div>
           ) : (
             <>
               <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
@@ -167,11 +167,11 @@ const Login = () => {
         </button>
 
         <div className="mt-6 text-center">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
             Need help? Read our{' '}
             <Link 
               to="/privacy" 
-              className="text-primary-600 hover:text-primary-500 underline"
+              className="text-primary-600 dark:text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 underline"
             >
               Privacy Policy
             </Link>
@@ -179,26 +179,26 @@ const Login = () => {
           </p>
         </div>
 
-        <div className="mt-8 border-t border-gray-200 pt-6">
+        <div className="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
           <div className="text-center">
-            <h3 className="text-lg font-medium text-gray-900 mb-3">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-3">
               What you'll get with Cally:
             </h3>
-            <ul className="text-sm text-gray-600 space-y-2">
+            <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-2">
               <li className="flex items-center">
-                <svg className="w-4 h-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-4 h-4 text-green-500 dark:text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
                 Google Calendar integration
               </li>
               <li className="flex items-center">
-                <svg className="w-4 h-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-4 h-4 text-green-500 dark:text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
                 Jira & GitHub task management
               </li>
               <li className="flex items-center">
-                <svg className="w-4 h-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-4 h-4 text-green-500 dark:text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
                 Unified task scheduling

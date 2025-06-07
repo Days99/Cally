@@ -840,18 +840,18 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
 
   return (
     <div 
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      className="modal-overlay"
       onClick={(e) => e.target === e.currentTarget && onClose()}
       onKeyDown={handleKeyDown}
       tabIndex={-1}
     >
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <div className="modal-content max-w-4xl">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center space-x-3">
             <span className="text-2xl">{eventTypeDisplay.icon}</span>
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                 {isCreating ? 'Create New Event' : (isEditing ? 'Edit Event' : 'Event Details')}
               </h2>
               <div className="flex items-center space-x-2 mt-1">
@@ -859,10 +859,10 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                   {eventTypeDisplay.label}
                 </span>
                 {eventTypeDisplay.account && (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                  <span className="badge-gray">
                     👥 {eventTypeDisplay.account.name || eventTypeDisplay.account.email}
                     {eventTypeDisplay.account.isPrimary && (
-                      <span className="ml-1 text-yellow-600">★</span>
+                      <span className="ml-1 text-yellow-600 dark:text-yellow-400">★</span>
                     )}
                   </span>
                 )}
@@ -871,7 +871,7 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="btn-icon text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -882,8 +882,8 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
         {/* Content */}
         <div className="p-6">
           {error && (
-            <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-4">
-              <p className="text-sm text-red-800">{error}</p>
+            <div className="alert-error mb-4">
+              <p className="text-sm text-error-800 dark:text-error-200">{error}</p>
             </div>
           )}
 
@@ -891,8 +891,8 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
             <div className="space-y-4">
               {/* Event Type Selection (only for new events) */}
               {isCreating && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="form-group">
+                  <label className="form-label">
                     Event Type *
                   </label>
                   <div className="grid grid-cols-2 gap-2">
@@ -903,15 +903,15 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                         onClick={() => setFormData(prev => ({ ...prev, eventType: key }))}
                         className={`p-3 border rounded-lg text-left transition-colors ${
                           formData.eventType === key
-                            ? 'border-primary-500 bg-primary-50'
-                            : 'border-gray-300 hover:border-gray-400'
+                            ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                            : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'
                         }`}
                       >
                         <div className="flex items-center space-x-2">
                           <span className="text-lg">{type.icon}</span>
                           <div>
-                            <p className="font-medium text-sm">{type.label}</p>
-                            <p className="text-xs text-gray-500">{type.description}</p>
+                            <p className="font-medium text-sm text-gray-900 dark:text-gray-100">{type.label}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{type.description}</p>
                           </div>
                         </div>
                       </button>
@@ -922,15 +922,15 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
 
               {/* Account Selection (for integrated event types) */}
               {formData.eventType !== 'manual' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                <div className="form-group">
+                  <label className="form-label">
                     Account *
                   </label>
                   <select
                     name="accountId"
                     value={formData.accountId || ''}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="input-field"
                     required
                   >
                     <option value="">Select an account...</option>
@@ -942,19 +942,19 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                     ))}
                   </select>
                   {getAvailableAccounts(formData.eventType).length === 0 && (
-                    <p className="text-xs text-red-600 mt-1">
+                    <p className="form-error">
                       No {formData.eventType.replace('_', ' ')} accounts connected. Please add an account first.
                     </p>
                   )}
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="form-help">
                     Debug: {accounts.length} total accounts loaded, {getAvailableAccounts(formData.eventType).length} available for {formData.eventType}
                   </p>
                 </div>
               )}
 
               {/* Title */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+              <div className="form-group">
+                <label className="form-label">
                   Title *
                 </label>
                 <input
@@ -962,14 +962,14 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                   name="title"
                   value={formData.title}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="input-field"
                   required
                 />
               </div>
 
               {/* Description */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+              <div className="form-group">
+                <label className="form-label">
                   Description
                 </label>
                 <textarea
@@ -977,7 +977,7 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                   value={formData.description}
                   onChange={handleInputChange}
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="input-field"
                 />
               </div>
 
@@ -988,17 +988,17 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                   name="isAllDay"
                   checked={formData.isAllDay}
                   onChange={handleInputChange}
-                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
                 />
-                <label className="ml-2 block text-sm text-gray-900">
+                <label className="ml-2 block text-sm text-gray-900 dark:text-gray-100">
                   All day event
                 </label>
               </div>
 
               {/* Date/Time */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                <div className="form-group">
+                  <label className="form-label">
                     Start {formData.isAllDay ? 'Date' : 'Date & Time'} *
                   </label>
                   <input
@@ -1006,12 +1006,12 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                     name="startDateTime"
                     value={formData.isAllDay ? formData.startDateTime.split('T')[0] : formData.startDateTime}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="input-field"
                     required
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                <div className="form-group">
+                  <label className="form-label">
                     End {formData.isAllDay ? 'Date' : 'Date & Time'} *
                   </label>
                   <input
@@ -1019,15 +1019,15 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                     name="endDateTime"
                     value={formData.isAllDay ? formData.endDateTime.split('T')[0] : formData.endDateTime}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="input-field"
                     required
                   />
                 </div>
               </div>
 
               {/* Location */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+              <div className="form-group">
+                <label className="form-label">
                   Location
                 </label>
                 <input
@@ -1035,18 +1035,18 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                   name="location"
                   value={formData.location}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="input-field"
                 />
               </div>
 
               {/* Event Type Specific Fields */}
               {formData.eventType === 'jira_task' && (
-                <div className="bg-green-50 border border-green-200 rounded-md p-4">
-                  <h4 className="text-sm font-medium text-green-900 mb-3">Jira Task Details</h4>
+                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md p-4">
+                  <h4 className="text-sm font-medium text-green-900 dark:text-green-200 mb-3">Jira Task Details</h4>
                   
                   {/* Task Association Type */}
                   <div className="mb-4">
-                    <label className="block text-xs font-medium text-green-700 mb-2">
+                    <label className="block text-xs font-medium text-green-700 dark:text-green-300 mb-2">
                       Task Association
                     </label>
                     <div className="flex space-x-4">
@@ -1057,9 +1057,9 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                           value="create"
                           checked={formData.jiraAssociationType === 'create'}
                           onChange={handleInputChange}
-                          className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300"
+                          className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"
                         />
-                        <span className="ml-2 text-sm text-green-700">Create New Issue</span>
+                        <span className="ml-2 text-sm text-green-700 dark:text-green-300">Create New Issue</span>
                       </label>
                       <label className="flex items-center">
                         <input
@@ -1068,9 +1068,9 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                           value="existing"
                           checked={formData.jiraAssociationType === 'existing'}
                           onChange={handleInputChange}
-                          className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300"
+                          className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"
                         />
-                        <span className="ml-2 text-sm text-green-700">Link Existing Issue</span>
+                        <span className="ml-2 text-sm text-green-700 dark:text-green-300">Link Existing Issue</span>
                       </label>
                     </div>
                   </div>
@@ -1078,12 +1078,12 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                   {formData.jiraAssociationType === 'existing' ? (
                     <div className="space-y-3">
                       <div>
-                        <label className="block text-xs font-medium text-green-700 mb-1">
+                        <label className="block text-xs font-medium text-green-700 dark:text-green-300 mb-1">
                           Select Issue *
                         </label>
                         {loadingJiraIssues ? (
-                          <div className="w-full px-2 py-1 text-sm border border-green-300 rounded bg-green-50 text-green-600 flex items-center">
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600 mr-2"></div>
+                          <div className="w-full px-2 py-1 text-sm border border-green-300 dark:border-green-700 rounded bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 flex items-center">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600 dark:border-green-400 mr-2"></div>
                             Loading available issues...
                           </div>
                         ) : jiraIssues.length > 0 ? (
@@ -1091,7 +1091,7 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                             name="existingJiraKey"
                             value={formData.existingJiraKey || ''}
                             onChange={handleInputChange}
-                            className="w-full px-2 py-1 text-sm border border-green-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                            className="w-full px-2 py-1 text-sm border border-green-300 dark:border-green-700 rounded focus:outline-none focus:ring-1 focus:ring-green-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                           >
                             <option value="">Select an issue...</option>
                             {jiraIssues.map(issue => (
@@ -1101,26 +1101,26 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                             ))}
                           </select>
                         ) : formData.accountId && !loadingJiraIssues ? (
-                          <div className="w-full px-2 py-1 text-sm border border-orange-300 rounded bg-orange-50">
-                            <p className="text-orange-700">No open issues found assigned to you.</p>
-                            <p className="text-xs text-orange-600 mt-1">
+                          <div className="w-full px-2 py-1 text-sm border border-orange-300 dark:border-orange-700 rounded bg-orange-50 dark:bg-orange-900/20">
+                            <p className="text-orange-700 dark:text-orange-300">No open issues found assigned to you.</p>
+                            <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
                               You can still create a new issue instead.
                             </p>
                           </div>
                         ) : (
-                          <div className="w-full px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50 text-gray-500">
+                          <div className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
                             Select a Jira account first to load available issues
                           </div>
                         )}
                         
                         {/* Show selected issue details */}
                         {formData.existingJiraKey && jiraIssues.length > 0 && (
-                          <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs">
+                          <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded text-xs">
                             {(() => {
                               const selectedIssue = jiraIssues.find(issue => issue.key === formData.existingJiraKey);
                               if (selectedIssue) {
                                 return (
-                                  <div>
+                                  <div className="text-green-800 dark:text-green-200">
                                     <p><strong>Issue:</strong> {selectedIssue.key}</p>
                                     <p><strong>Summary:</strong> {selectedIssue.summary}</p>
                                     <p><strong>Status:</strong> {selectedIssue.status}</p>
@@ -1133,20 +1133,18 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                             })()}
                           </div>
                         )}
-
-                        
                       </div>
                     </div>
                   ) : (
                     <div className="space-y-4">
                       {/* Dynamic Project Selection */}
                       <div>
-                        <label className="block text-xs font-medium text-green-700 mb-1">
+                        <label className="block text-xs font-medium text-green-700 dark:text-green-300 mb-1">
                           Project *
                         </label>
                         {loadingProjects ? (
-                          <div className="w-full px-2 py-1 text-sm border border-green-300 rounded bg-green-50 text-green-600 flex items-center">
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600 mr-2"></div>
+                          <div className="w-full px-2 py-1 text-sm border border-green-300 dark:border-green-700 rounded bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 flex items-center">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600 dark:border-green-400 mr-2"></div>
                             Loading projects...
                           </div>
                         ) : projects.length > 0 ? (
@@ -1154,7 +1152,7 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                             name="jiraProjectKey"
                             value={formData.jiraProjectKey}
                             onChange={handleInputChange}
-                            className="w-full px-2 py-1 text-sm border border-green-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                            className="w-full px-2 py-1 text-sm border border-green-300 dark:border-green-700 rounded focus:outline-none focus:ring-1 focus:ring-green-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                             required
                           >
                             <option value="">Select a project...</option>
@@ -1165,20 +1163,20 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                             ))}
                           </select>
                         ) : formData.accountId && !loadingProjects ? (
-                          <div className="w-full px-2 py-1 text-sm border border-orange-300 rounded bg-orange-50">
-                            <p className="text-orange-700">No projects found for this account.</p>
-                            <p className="text-xs text-orange-600 mt-1">
+                          <div className="w-full px-2 py-1 text-sm border border-orange-300 dark:border-orange-700 rounded bg-orange-50 dark:bg-orange-900/20">
+                            <p className="text-orange-700 dark:text-orange-300">No projects found for this account.</p>
+                            <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
                               Make sure you have permissions to create issues.
                             </p>
                           </div>
                         ) : (
-                          <div className="w-full px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50 text-gray-500">
+                          <div className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
                             Select a Jira account first to load projects
                           </div>
                         )}
                         {loadingProjects && (
-                          <div className="mt-1 flex items-center text-xs text-green-600">
-                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600 mr-1"></div>
+                          <div className="mt-1 flex items-center text-xs text-green-600 dark:text-green-400">
+                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600 dark:border-green-400 mr-1"></div>
                             Loading available projects...
                           </div>
                         )}
@@ -1187,14 +1185,14 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                       {/* Dynamic Issue Type - only show if data is available */}
                       {projectMetadata.issueTypes.length > 0 && (
                         <div>
-                          <label className="block text-xs font-medium text-green-700 mb-1">
+                          <label className="block text-xs font-medium text-green-700 dark:text-green-300 mb-1">
                             Issue Type *
                           </label>
                           <select
                             name="jiraIssueType"
                             value={formData.jiraIssueType}
                             onChange={handleInputChange}
-                            className="w-full px-2 py-1 text-sm border border-green-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                            className="w-full px-2 py-1 text-sm border border-green-300 dark:border-green-700 rounded focus:outline-none focus:ring-1 focus:ring-green-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                             disabled={loadingMetadata}
                             required
                           >
@@ -1208,8 +1206,8 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                             ))}
                           </select>
                           {loadingMetadata && (
-                            <div className="mt-1 flex items-center text-xs text-green-600">
-                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600 mr-1"></div>
+                            <div className="mt-1 flex items-center text-xs text-green-600 dark:text-green-400">
+                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600 dark:border-green-400 mr-1"></div>
                               Loading project configuration...
                             </div>
                           )}
@@ -1221,14 +1219,14 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                         {/* Dynamic Priority - only show if data is available */}
                         {projectMetadata.priorities.length > 0 && (
                           <div>
-                            <label className="block text-xs font-medium text-green-700 mb-1">
+                            <label className="block text-xs font-medium text-green-700 dark:text-green-300 mb-1">
                               Priority
                             </label>
                             <select
                               name="priority"
                               value={formData.priority}
                               onChange={handleInputChange}
-                              className="w-full px-2 py-1 text-sm border border-green-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                              className="w-full px-2 py-1 text-sm border border-green-300 dark:border-green-700 rounded focus:outline-none focus:ring-1 focus:ring-green-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                               disabled={loadingMetadata}
                             >
                               <option value="">
@@ -1246,324 +1244,103 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                         {/* Dynamic Assignee - only show if data is available */}
                         {projectMetadata.assignableUsers.length > 0 && (
                           <div>
-                            <label className="block text-xs font-medium text-green-700 mb-1">
+                            <label className="block text-xs font-medium text-green-700 dark:text-green-300 mb-1">
                               Assignee
                             </label>
                             <select
                               name="assignee"
                               value={formData.assignee}
                               onChange={handleInputChange}
-                              className="w-full px-2 py-1 text-sm border border-green-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                              className="w-full px-2 py-1 text-sm border border-green-300 dark:border-green-700 rounded focus:outline-none focus:ring-1 focus:ring-green-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                               disabled={loadingMetadata}
                             >
-                              <option value="">Unassigned</option>
+                              <option value="">
+                                {loadingMetadata ? "Loading assignees..." : "Select assignee..."}
+                              </option>
                               {projectMetadata.assignableUsers.map(user => (
                                 <option key={user.accountId} value={user.accountId}>
-                                  {user.displayName} ({user.emailAddress || user.accountId})
+                                  {user.displayName} ({user.emailAddress})
                                 </option>
                               ))}
                             </select>
                           </div>
                         )}
                       </div>
-
-                      {/* Additional metadata loading indicator */}
-                      {loadingMetadata && formData.jiraProjectKey && (
-                        <div className="text-xs text-green-600 flex items-center">
-                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600 mr-2"></div>
-                          Loading project metadata (issue types, priorities, assignable users)...
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
               )}
 
-              {formData.eventType === 'google_calendar' && (
-                <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-                  <h4 className="text-sm font-medium text-blue-900 mb-3">Google Calendar Settings</h4>
-                  <div>
-                    <label className="block text-xs font-medium text-blue-700 mb-1">
-                      Calendar
-                    </label>
-                    <select
-                      name="googleCalendarId"
-                      value={formData.googleCalendarId}
-                      onChange={handleInputChange}
-                      className="w-full px-2 py-1 text-sm border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    >
-                      <option value="primary">Primary Calendar</option>
-                      {/* TODO: Load user's calendars */}
-                    </select>
-                  </div>
-                </div>
-              )}
-
+              {/* GitHub Issue Fields */}
               {formData.eventType === 'github_issue' && (
-                <div className="bg-purple-50 border border-purple-200 rounded-md p-4">
-                  <h4 className="text-sm font-medium text-purple-900 mb-3">GitHub Issue Details</h4>
+                <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-md p-4">
+                  <h4 className="text-sm font-medium text-purple-900 dark:text-purple-200 mb-3">GitHub Issue Details</h4>
                   
-                  {/* Issue Association Type */}
-                  <div className="mb-4">
-                    <label className="block text-xs font-medium text-purple-700 mb-2">
-                      Issue Association
-                    </label>
-                    <div className="flex space-x-4">
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          name="githubAssociationType"
-                          value="create"
-                          checked={formData.githubAssociationType === 'create'}
-                          onChange={handleInputChange}
-                          className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300"
-                        />
-                        <span className="ml-2 text-sm text-purple-700">Create New Issue</span>
-                      </label>
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          name="githubAssociationType"
-                          value="existing"
-                          checked={formData.githubAssociationType === 'existing'}
-                          onChange={handleInputChange}
-                          className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300"
-                        />
-                        <span className="ml-2 text-sm text-purple-700">Link Existing Issue</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  {formData.githubAssociationType === 'existing' ? (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-xs font-medium text-purple-700 mb-1">
-                          Repository *
-                        </label>
-                        <input
-                          type="text"
-                          name="githubRepository"
-                          value={formData.githubRepository || ''}
-                          onChange={handleInputChange}
-                          placeholder="e.g., owner/repo-name"
-                          className="w-full px-2 py-1 text-sm border border-purple-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-purple-700 mb-1">
-                          Issue Number *
-                        </label>
-                        <input
-                          type="number"
-                          name="githubIssueNumber"
-                          value={formData.githubIssueNumber || ''}
-                          onChange={handleInputChange}
-                          placeholder="e.g., 123"
-                          className="w-full px-2 py-1 text-sm border border-purple-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
-                        />
-                        <p className="text-xs text-purple-600 mt-1">
-                          Enter the GitHub issue number from the repository
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-xs font-medium text-purple-700 mb-1">
-                          Repository *
-                        </label>
-                        <input
-                          type="text"
-                          name="githubRepository"
-                          value={formData.githubRepository || ''}
-                          onChange={handleInputChange}
-                          placeholder="e.g., owner/repo-name"
-                          className="w-full px-2 py-1 text-sm border border-purple-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-purple-700 mb-1">
-                          Labels
-                        </label>
-                        <input
-                          type="text"
-                          name="githubLabels"
-                          value={formData.githubLabels || ''}
-                          onChange={handleInputChange}
-                          placeholder="e.g., bug, enhancement (comma-separated)"
-                          className="w-full px-2 py-1 text-sm border border-purple-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-purple-700 mb-1">
-                          Assignee
-                        </label>
-                        <input
-                          type="text"
-                          name="githubAssignee"
-                          value={formData.githubAssignee || ''}
-                          onChange={handleInputChange}
-                          placeholder="GitHub username"
-                          className="w-full px-2 py-1 text-sm border border-purple-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
-                        />
-                      </div>
-                    </div>
-                  )}
+                  {/* GitHub fields would go here - similar to Jira fields but for GitHub */}
+                  <p className="text-sm text-purple-700 dark:text-purple-300">GitHub integration coming soon...</p>
                 </div>
               )}
             </div>
           ) : (
+            /* View Mode */
             <div className="space-y-4">
-              {/* Title */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  {event?.extendedProps?.originalTitle || event?.title}
-                </h3>
+              {/* Basic Event Info */}
+              <div className="space-y-3">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">{event?.title}</h3>
+                  {event?.description && (
+                    <p className="text-gray-600 dark:text-gray-400 text-sm">{event.description}</p>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="font-medium text-gray-700 dark:text-gray-300">Date & Time:</span>
+                    <div className="text-gray-600 dark:text-gray-400 mt-1">
+                      {event?.allDay ? (
+                        <div>{formatLocalDateTime(event?.start)}</div>
+                      ) : (
+                        <div>
+                          <div>Start: {formatLocalDateTime(event?.start)}</div>
+                          <div>End: {formatLocalDateTime(event?.end)}</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {event?.extendedProps?.location && (
+                    <div>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">Location:</span>
+                      <div className="text-gray-600 dark:text-gray-400 mt-1">{event.extendedProps.location}</div>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Description */}
-              {event?.extendedProps?.description && (
-                <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-1">Description</h4>
-                  <p className="text-gray-600 whitespace-pre-wrap">{event.extendedProps.description}</p>
-                </div>
-              )}
-
-              {/* Date/Time */}
-              {event && (
-                <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-1">When</h4>
-                  <div className="text-gray-600">
-                    {event.allDay ? (
-                      <span>
-                        {new Date(event.start).toLocaleDateString()} 
-                        {event.end && new Date(event.end).toDateString() !== new Date(event.start).toDateString() && 
-                          ` - ${new Date(event.end).toLocaleDateString()}`}
-                        <span className="ml-2 text-xs bg-gray-100 px-2 py-1 rounded">All day</span>
-                      </span>
-                    ) : (
-                      <span>
-                        {new Date(event.start).toLocaleString()} - {new Date(event.end).toLocaleString()}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Location */}
-              {event?.extendedProps?.location && (
-                <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-1">Location</h4>
-                  <p className="text-gray-600">📍 {event.extendedProps.location}</p>
-                </div>
-              )}
-
-              {/* Event Type Specific Info */}
+              {/* Event Type Specific Details */}
               {event && getEventType() === 'google_calendar' && (
-                <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-                  <h4 className="text-sm font-medium text-blue-900 mb-2">Google Calendar Details</h4>
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-4">
+                  <h4 className="text-sm font-medium text-blue-900 dark:text-blue-200 mb-2">Google Calendar Event</h4>
                   <div className="space-y-2 text-sm">
-                    {event.extendedProps?.metadata?.calendarId && (
+                    <div>
+                      <span className="font-medium text-blue-700 dark:text-blue-300">Calendar:</span>
+                      <span className="ml-1 text-blue-600 dark:text-blue-400">{event?.extendedProps?.calendarSummary || 'Primary'}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-blue-700 dark:text-blue-300">Status:</span>
+                      <span className="ml-1 text-blue-600 dark:text-blue-400">{event?.extendedProps?.status || 'confirmed'}</span>
+                    </div>
+                    {event?.extendedProps?.htmlLink && (
                       <div>
-                        <span className="font-medium text-blue-700">Calendar:</span>
-                        <span className="ml-1 text-blue-600">
-                          {event.extendedProps.metadata.calendarId === 'primary' ? 'Primary Calendar' : event.extendedProps.metadata.calendarId}
-                        </span>
-                      </div>
-                    )}
-                    
-                    {(event?.extendedProps?.description || event?.extendedProps?.metadata?.description || event?.extendedProps?.hangoutLink) && (
-                      <div>
-                        <span className="font-medium text-blue-700">Description:</span>
-                        <div className="ml-1 mt-1 p-2 bg-white rounded border text-blue-800 text-sm max-h-20 overflow-y-auto">
-                          {(event.extendedProps.metadata?.description || event.extendedProps.description) && (
-                            <div>{event.extendedProps.metadata?.description || event.extendedProps.description}</div>
-                          )}
-                          {event.extendedProps?.hangoutLink && (
-                            <div className={`${(event.extendedProps.metadata?.description || event.extendedProps.description) ? 'mt-2 pt-2 border-t border-blue-200' : ''}`}>
-                              <span className="text-blue-700 font-medium">Meeting Link: </span>
-                              <a 
-                                href={event.extendedProps.hangoutLink} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-blue-500 underline"
-                              >
-                                📹 {event.extendedProps.hangoutLink}
-                              </a>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {event.extendedProps?.status && (
-                      <div>
-                        <span className="font-medium text-blue-700">Status:</span>
-                        <span className={`ml-1 px-2 py-1 rounded-full text-xs font-medium ${
-                          event.extendedProps.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                          event.extendedProps.status === 'tentative' ? 'bg-yellow-100 text-yellow-800' :
-                          event.extendedProps.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {event.extendedProps.status}
-                        </span>
-                      </div>
-                    )}
-                    
-                    {event.extendedProps?.metadata?.organizer && (
-                      <div>
-                        <span className="font-medium text-blue-700">Organizer:</span>
-                        <span className="ml-1 text-blue-600">
-                          {event.extendedProps.metadata.organizer.displayName || event.extendedProps.metadata.organizer.email}
-                        </span>
-                      </div>
-                    )}
-                    
-                    {event.extendedProps?.metadata?.attendees && event.extendedProps.metadata.attendees.length > 0 && (
-                      <div>
-                        <span className="font-medium text-blue-700">Attendees:</span>
-                        <div className="ml-1 mt-1">
-                          {event.extendedProps.metadata.attendees.slice(0, 3).map((attendee, index) => (
-                            <span key={index} className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full mr-1 mb-1">
-                              {attendee.displayName || attendee.email}
-                            </span>
-                          ))}
-                          {event.extendedProps.metadata.attendees.length > 3 && (
-                            <span className="text-blue-600 text-xs">
-                              +{event.extendedProps.metadata.attendees.length - 3} more
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {event.extendedProps?.hangoutLink && (
-                      <div>
-                        <span className="font-medium text-blue-700">Meeting:</span>
+                        <span className="font-medium text-blue-700 dark:text-blue-300">Link:</span>
                         <a 
-                          href={event.extendedProps.hangoutLink} 
+                          href={event.extendedProps.htmlLink} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="ml-1 text-blue-600 hover:text-blue-500 underline text-sm"
+                          className="ml-1 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 underline"
                         >
-                          📹 Join Google Meet
+                          Open in Google Calendar
                         </a>
-                      </div>
-                    )}
-                    
-                    {event.extendedProps?.account && (
-                      <div>
-                        <span className="font-medium text-blue-700">Google Account:</span>
-                        <span className="ml-1 text-blue-600">{event.extendedProps.account.email}</span>
-                      </div>
-                    )}
-                    
-                    {event.extendedProps?.lastSyncAt && (
-                      <div>
-                        <span className="font-medium text-blue-700">Last Synced:</span>
-                        <span className="ml-1 text-blue-600 text-xs">
-                          {new Date(event.extendedProps.lastSyncAt).toLocaleString()}
-                        </span>
                       </div>
                     )}
                   </div>
@@ -1571,99 +1348,42 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
               )}
 
               {event && getEventType() === 'jira_task' && (
-                <div className="bg-green-50 border border-green-200 rounded-md p-4">
-                  <h4 className="text-sm font-medium text-green-900 mb-2">Jira Task Details</h4>
+                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md p-4">
+                  <h4 className="text-sm font-medium text-green-900 dark:text-green-200 mb-2">Jira Task Details</h4>
                   <div className="space-y-2 text-sm">
-                    {event?.extendedProps?.jiraKey && (
+                    <div>
+                      <span className="font-medium text-green-700 dark:text-green-300">Issue Key:</span>
+                      <span className="ml-1 text-green-600 dark:text-green-400">{event?.extendedProps?.jiraKey}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-green-700 dark:text-green-300">Status:</span>
+                      <span className="ml-1 text-green-600 dark:text-green-400">{event?.extendedProps?.status}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-green-700 dark:text-green-300">Priority:</span>
+                      <span className="ml-1 text-green-600 dark:text-green-400">{event?.extendedProps?.priority}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-green-700 dark:text-green-300">Project:</span>
+                      <span className="ml-1 text-green-600 dark:text-green-400">{event?.extendedProps?.project}</span>
+                    </div>
+                    {event?.extendedProps?.jiraUrl && (
                       <div>
-                        <span className="font-medium text-green-700">Issue Key:</span>
-                        <span className="ml-1 text-green-600 font-mono">{event.extendedProps.jiraKey}</span>
+                        <span className="font-medium text-green-700 dark:text-green-300">Link:</span>
+                        <a 
+                          href={event.extendedProps.jiraUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="ml-1 text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-200 underline"
+                        >
+                          Open in Jira
+                        </a>
                       </div>
                     )}
-                    
-                    {event?.extendedProps?.metadata?.project && (
-                      <div>
-                        <span className="font-medium text-green-700">Project:</span>
-                        <span className="ml-1 text-green-600">{event.extendedProps.metadata.project}</span>
-                      </div>
-                    )}
-                    
-                    {event?.extendedProps?.metadata?.issueType && (
-                      <div>
-                        <span className="font-medium text-green-700">Issue Type:</span>
-                        <span className="ml-1 text-green-600">{event.extendedProps.metadata.issueType}</span>
-                      </div>
-                    )}
-                    
-                    {(event?.extendedProps?.metadata?.description) && (
-                      <div>
-                        <span className="font-medium text-green-700">Jira Description:</span>
-                        <div className="ml-1 mt-1 p-2 bg-white rounded border text-green-800 text-sm max-h-20 overflow-y-auto">
-                          {event.extendedProps.metadata.description}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {event?.extendedProps?.metadata?.status && (
-                      <div>
-                        <span className="font-medium text-green-700">Status:</span>
-                        <span className={`ml-1 px-2 py-1 rounded-full text-xs font-medium ${
-                          event.extendedProps.metadata.statusCategory === 'Done' ? 'bg-green-100 text-green-800' :
-                          event.extendedProps.metadata.statusCategory === 'In Progress' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {event.extendedProps.metadata.status}
-                        </span>
-                      </div>
-                    )}
-                    
-                    {event?.extendedProps?.priority && (
-                      <div>
-                        <span className="font-medium text-green-700">Priority:</span>
-                        <span className={`ml-1 px-2 py-1 rounded-full text-xs font-medium ${
-                          event.extendedProps.priority === 'highest' ? 'bg-red-100 text-red-800' :
-                          event.extendedProps.priority === 'high' ? 'bg-orange-100 text-orange-800' :
-                          event.extendedProps.priority === 'medium' ? 'bg-blue-100 text-blue-800' :
-                          event.extendedProps.priority === 'low' ? 'bg-green-100 text-green-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {event.extendedProps.priority}
-                        </span>
-                      </div>
-                    )}
-                    
-                    {event?.extendedProps?.assignee && (
-                      <div>
-                        <span className="font-medium text-green-700">Assignee:</span>
-                        <span className="ml-1 text-green-600">{event.extendedProps.assignee}</span>
-                      </div>
-                    )}
-                    
-                    {event?.extendedProps?.account && (
-                      <div>
-                        <span className="font-medium text-green-700">Jira Account:</span>
-                        <span className="ml-1 text-green-600">{event.extendedProps.account.name}</span>
-                      </div>
-                    )}
-                    
-                    {event?.extendedProps?.syncStatus && (
-                      <div>
-                        <span className="font-medium text-green-700">Sync Status:</span>
-                        <span className={`ml-1 px-2 py-1 rounded-full text-xs font-medium ${
-                          event.extendedProps.syncStatus === 'synced' ? 'bg-green-100 text-green-800' :
-                          event.extendedProps.syncStatus === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                          event.extendedProps.syncStatus === 'error' ? 'bg-red-100 text-red-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {event.extendedProps.syncStatus}
-                        </span>
-                      </div>
-                    )}
-                    
                     {event?.extendedProps?.metadata?.lastSynced && (
                       <div>
-                        <span className="font-medium text-green-700">Last Synced:</span>
-                        <span className="ml-1 text-green-600 text-xs">
+                        <span className="font-medium text-green-700 dark:text-green-300">Last Synced:</span>
+                        <span className="ml-1 text-green-600 dark:text-green-400 text-xs">
                           {new Date(event.extendedProps.metadata.lastSynced).toLocaleString()}
                         </span>
                       </div>
@@ -1672,8 +1392,8 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
 
                   {/* Status Transitions - available in view mode for linked Jira tasks */}
                   {event?.extendedProps?.jiraKey && event?.extendedProps?.account?.id && (
-                    <div className="mt-4 pt-3 border-t border-green-200">
-                      <h5 className="text-sm font-medium text-green-800 mb-2">Change Status</h5>
+                    <div className="mt-4 pt-3 border-t border-green-200 dark:border-green-800">
+                      <h5 className="text-sm font-medium text-green-800 dark:text-green-200 mb-2">Change Status</h5>
                       {issueTransitions.length > 0 ? (
                         <div className="grid grid-cols-1 gap-2">
                           {issueTransitions.map((transition) => (
@@ -1690,19 +1410,19 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                                 handleStatusTransition(transition.id);
                               }}
                               disabled={loadingTransitions}
-                              className="px-3 py-2 text-xs bg-green-100 hover:bg-green-200 border border-green-300 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="px-3 py-2 text-xs bg-green-100 dark:bg-green-900/20 hover:bg-green-200 dark:hover:bg-green-800/30 border border-green-300 dark:border-green-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               <div className="flex items-center justify-between">
-                                <span className="font-medium">
+                                <span className="font-medium text-green-800 dark:text-green-200">
                                   {transition.name}
                                   {transition.to?.name && (
-                                    <span className="text-green-600 font-normal">
+                                    <span className="text-green-600 dark:text-green-400 font-normal">
                                       {' → ' + transition.to.name}
                                     </span>
                                   )}
                                 </span>
                                 {loadingTransitions && (
-                                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600"></div>
+                                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600 dark:border-green-400"></div>
                                 )}
                               </div>
                             </button>
@@ -1720,17 +1440,17 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                             loadIssueTransitions(event.extendedProps.account.id, event.extendedProps.jiraKey);
                           }}
                           disabled={loadingTransitions}
-                          className="px-3 py-2 text-xs bg-green-100 hover:bg-green-200 border border-green-300 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                          className="px-3 py-2 text-xs bg-green-100 dark:bg-green-900/20 hover:bg-green-200 dark:hover:bg-green-800/30 border border-green-300 dark:border-green-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                         >
                           {loadingTransitions ? (
                             <>
-                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600 mr-2"></div>
-                              Loading transitions...
+                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600 dark:border-green-400 mr-2"></div>
+                              <span className="text-green-800 dark:text-green-200">Loading transitions...</span>
                             </>
                           ) : (
-                            <>
+                            <span className="text-green-800 dark:text-green-200">
                               🔄 Load Available Status Changes
-                            </>
+                            </span>
                           )}
                         </button>
                       )}
@@ -1740,20 +1460,20 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
               )}
 
               {event && getEventType() === 'github_issue' && (
-                <div className="bg-purple-50 border border-purple-200 rounded-md p-4">
-                  <h4 className="text-sm font-medium text-purple-900 mb-2">GitHub Issue Details</h4>
+                <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-md p-4">
+                  <h4 className="text-sm font-medium text-purple-900 dark:text-purple-200 mb-2">GitHub Issue Details</h4>
                   <div className="space-y-2 text-sm">
                     <div>
-                      <span className="font-medium text-purple-700">Issue #:</span>
-                      <span className="ml-1 text-purple-600">{event?.extendedProps?.githubIssue}</span>
+                      <span className="font-medium text-purple-700 dark:text-purple-300">Issue #:</span>
+                      <span className="ml-1 text-purple-600 dark:text-purple-400">{event?.extendedProps?.githubIssue}</span>
                     </div>
                     <div>
-                      <span className="font-medium text-purple-700">Repository:</span>
-                      <span className="ml-1 text-purple-600">{event?.extendedProps?.repository}</span>
+                      <span className="font-medium text-purple-700 dark:text-purple-300">Repository:</span>
+                      <span className="ml-1 text-purple-600 dark:text-purple-400">{event?.extendedProps?.repository}</span>
                     </div>
                     <div>
-                      <span className="font-medium text-purple-700">Assignee:</span>
-                      <span className="ml-1 text-purple-600">{event?.extendedProps?.assignee || 'Unassigned'}</span>
+                      <span className="font-medium text-purple-700 dark:text-purple-300">Assignee:</span>
+                      <span className="ml-1 text-purple-600 dark:text-purple-400">{event?.extendedProps?.assignee || 'Unassigned'}</span>
                     </div>
                   </div>
                 </div>
@@ -1763,17 +1483,17 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
+        <div className="flex items-center justify-between p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
           <div className="flex items-center space-x-2">
             {!isEditing && !isCreating && (
               <button
                 onClick={handleDelete}
                 disabled={isSaving}
-                className="px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-300 rounded-md hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-error"
               >
                 {isSaving ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-700 mr-2 inline-block"></div>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-error-700 mr-2 inline-block"></div>
                     Deleting...
                   </>
                 ) : (
@@ -1792,7 +1512,7 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                 href={event.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="btn-secondary"
               >
                 <svg className="w-4 h-4 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -1808,14 +1528,14 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
                 <button
                   onClick={() => isCreating ? onClose() : setIsEditing(false)}
                   disabled={isSaving}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
+                  className="btn-secondary"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSave}
                   disabled={isSaving}
-                  className="px-4 py-2 text-sm font-medium text-white bg-primary-600 border border-transparent rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
+                  className="btn-primary"
                 >
                   {isSaving ? (
                     <>
@@ -1831,13 +1551,13 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
               <>
                 <button
                   onClick={onClose}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="btn-secondary"
                 >
                   Close
                 </button>
                 <button
                   onClick={() => setIsEditing(true)}
-                  className="px-4 py-2 text-sm font-medium text-white bg-primary-600 border border-transparent rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="btn-primary"
                 >
                   <svg className="w-4 h-4 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -1851,8 +1571,8 @@ const EventModal = ({ isOpen, onClose, event, onEventUpdated, onEventDeleted, is
 
         {/* Keyboard shortcuts hint */}
         <div className="px-6 pb-4">
-          <p className="text-xs text-gray-500">
-            💡 Tip: Press <kbd className="px-1 py-0.5 text-xs bg-gray-100 border rounded">Delete</kbd> or <kbd className="px-1 py-0.5 text-xs bg-gray-100 border rounded">Backspace</kbd> to delete, <kbd className="px-1 py-0.5 text-xs bg-gray-100 border rounded">Esc</kbd> to close
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            💡 Tip: Press <kbd className="px-1 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 border rounded">Delete</kbd> or <kbd className="px-1 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 border rounded">Backspace</kbd> to delete, <kbd className="px-1 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 border rounded">Esc</kbd> to close
           </p>
         </div>
       </div>
