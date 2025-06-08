@@ -243,25 +243,43 @@ const Tasks = () => {
   };
 
   const getPriorityColor = (priority) => {
-    const option = priorityOptions.find(opt => opt.value === priority?.toLowerCase());
+    // Handle different priority formats safely
+    let priorityValue = '';
+    
+    if (typeof priority === 'string') {
+      priorityValue = priority.toLowerCase();
+    } else if (priority && typeof priority === 'object' && priority.name) {
+      priorityValue = priority.name.toLowerCase();
+    } else {
+      priorityValue = '';
+    }
+    
+    const option = priorityOptions.find(opt => opt.value === priorityValue);
     return option ? option.color : 'text-gray-600 dark:text-gray-400';
   };
 
   const filteredIssues = issues.filter(issue => {
-    const matchesSearch = issue.fields.summary.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         issue.key.toLowerCase().includes(searchTerm.toLowerCase());
+    // Safely handle toLowerCase for search matching
+    const summary = issue.fields?.summary || '';
+    const issueKey = issue.key || '';
+    const summaryStr = typeof summary === 'string' ? summary : '';
+    const keyStr = typeof issueKey === 'string' ? issueKey : '';
+    
+    const matchesSearch = summaryStr.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         keyStr.toLowerCase().includes(searchTerm.toLowerCase());
     
     if (filter === 'all') return matchesSearch;
     
-    const statusName = issue.fields.status?.name?.toLowerCase() || '';
+    const statusName = issue.fields?.status?.name || '';
+    const statusNameStr = typeof statusName === 'string' ? statusName.toLowerCase() : '';
     
     switch (filter) {
       case 'todo':
-        return matchesSearch && (statusName.includes('to do') || statusName.includes('open') || statusName.includes('new'));
+        return matchesSearch && (statusNameStr.includes('to do') || statusNameStr.includes('open') || statusNameStr.includes('new'));
       case 'progress':
-        return matchesSearch && (statusName.includes('progress') || statusName.includes('development'));
+        return matchesSearch && (statusNameStr.includes('progress') || statusNameStr.includes('development'));
       case 'done':
-        return matchesSearch && (statusName.includes('done') || statusName.includes('complete') || statusName.includes('closed'));
+        return matchesSearch && (statusNameStr.includes('done') || statusNameStr.includes('complete') || statusNameStr.includes('closed'));
       default:
         return matchesSearch;
     }
@@ -349,7 +367,11 @@ const Tasks = () => {
 
         // Only add priority if the Jira issue has a priority
         if (hasContent(newIssueForm.priority)) {
-          eventData.priority = newIssueForm.priority.toLowerCase();
+          // Safely handle priority value for calendar event
+          const priorityValue = typeof newIssueForm.priority === 'string' 
+            ? newIssueForm.priority.toLowerCase() 
+            : (newIssueForm.priority?.name || '').toLowerCase();
+          eventData.priority = priorityValue;
         }
 
         console.log('Creating calendar event for issue:', eventData);
