@@ -59,6 +59,9 @@ const config = {
     PushNotifications: {
       presentationOptions: ['badge', 'sound', 'alert'],
     },
+    Browser: {
+      presentationStyle: 'popover',
+    },
   },
   ios: {
     contentInset: 'automatic',

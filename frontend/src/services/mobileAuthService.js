@@ -8,7 +8,7 @@ class MobileAuthService {
     this.isNative = Capacitor.isNativePlatform();
   }
 
-  // Mobile-specific Google OAuth flow
+  // Mobile-specific Google OAuth flow using browser
   async loginWithGoogle() {
     if (!this.isNative) {
       // Use web OAuth flow
@@ -16,6 +16,8 @@ class MobileAuthService {
     }
 
     try {
+      console.log('🔐 Starting mobile browser OAuth...');
+      
       // Get OAuth URL from backend
       const authUrl = await authService.getGoogleAuthUrl();
       
@@ -24,6 +26,8 @@ class MobileAuthService {
         encodeURIComponent('http://localhost:3000/auth/callback'),
         encodeURIComponent(`com.dayz99.cally://oauth/callback`)
       );
+
+      console.log('🌐 Opening browser for OAuth:', mobileAuthUrl);
 
       // Open browser for OAuth
       await Browser.open({
@@ -35,6 +39,8 @@ class MobileAuthService {
       return new Promise((resolve, reject) => {
         const listener = App.addListener('appUrlOpen', async (data) => {
           try {
+            console.log('📱 Received app URL:', data.url);
+            
             // Close the browser
             await Browser.close();
             
@@ -56,8 +62,11 @@ class MobileAuthService {
               return;
             }
 
+            console.log('✅ Authorization code received, exchanging for tokens...');
+
             // Exchange code for tokens (call your backend)
-            const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/google/callback`, {
+            const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+            const response = await fetch(`${apiUrl}/api/auth/google/callback`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -75,8 +84,10 @@ class MobileAuthService {
             // Store tokens
             authService.setTokens(tokenData.accessToken, tokenData.refreshToken);
             
+            console.log('✅ Mobile authentication successful');
             resolve(tokenData);
           } catch (error) {
+            console.error('❌ Auth callback error:', error);
             reject(error);
           }
         });
@@ -84,12 +95,18 @@ class MobileAuthService {
         // Set a timeout for the OAuth flow
         setTimeout(() => {
           listener.remove();
-          reject(new Error('OAuth timeout'));
+          reject(new Error('OAuth timeout - please try again'));
         }, 300000); // 5 minutes timeout
       });
 
     } catch (error) {
-      console.error('Mobile OAuth error:', error);
+      console.error('❌ Mobile OAuth error:', error);
+      
+      // Provide more specific error messages
+      if (error.message?.includes('UNIMPLEMENTED')) {
+        throw new Error('Browser plugin not available. Please install @capacitor/browser');
+      }
+      
       throw error;
     }
   }
@@ -107,7 +124,8 @@ class MobileAuthService {
 
       if (code) {
         // Exchange code for tokens
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/google/callback`, {
+        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+        const response = await fetch(`${apiUrl}/api/auth/google/callback`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

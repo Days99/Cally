@@ -23,6 +23,7 @@ router.get('/status', (req, res) => {
 // Google OAuth routes
 router.get('/google', authController.getGoogleAuthUrl);
 router.get('/google/callback', authController.googleCallback);
+router.post('/google/mobile', authController.googleMobileAuth);
 
 // Jira OAuth routes (redirect to main jira controller)
 router.get('/jira/callback', (req, res) => {
