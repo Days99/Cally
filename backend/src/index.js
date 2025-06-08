@@ -10,14 +10,23 @@ const sequelize = require('../config/database');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Production-ready CORS configuration
+// Production-ready CORS configuration with mobile app support
 const allowedOrigins = [
   process.env.FRONTEND_URL || 'http://localhost:3000',
   'http://localhost:3000', // Frontend dev server
   'http://localhost:3001', // Backend dev server
   'https://cally.pt',      // Production domain
   'https://www.cally.pt',  // Production domain with www
-  'https://cally-frontend.vercel.app' // Vercel deployment (if different)
+  'https://cally-frontend.vercel.app', // Vercel deployment (if different)
+  // Mobile app schemes with updated app ID
+  'capacitor://localhost',
+  'http://localhost',
+  'https://localhost',
+  'com.dayz99.cally://',
+  'com.dayz99.cally.staging://',
+  'com.dayz99.cally.dev://',
+  // Add file:// protocol for mobile development
+  'file://'
 ];
 
 // Add additional origins from environment variable if provided
@@ -27,17 +36,42 @@ if (process.env.ALLOWED_ORIGINS) {
 }
 
 // Middleware
-app.use(helmet());
+app.use(helmet({
+  // Allow Capacitor apps to load resources
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'", "capacitor://localhost", "http://localhost:*", "https://localhost:*"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:", "http:"],
+      connectSrc: ["'self'", "https:", "http:", "ws:", "wss:"],
+    },
+  },
+}));
+
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
+    // Allow requests with no origin (mobile apps, curl, Postman, etc.)
+    if (!origin) {
+      console.log('✅ Allowing request with no origin (likely mobile app or API client)');
+      return callback(null, true);
+    }
     
     // For localhost development, be more permissive
     if (process.env.NODE_ENV !== 'production') {
-      if (origin.startsWith('http://localhost:') || origin.startsWith('https://localhost:')) {
+      if (origin.startsWith('http://localhost:') || 
+          origin.startsWith('https://localhost:') ||
+          origin.startsWith('capacitor://localhost') ||
+          origin.startsWith('file://')) {
+        console.log('✅ Allowing development origin:', origin);
         return callback(null, true);
       }
+    }
+    
+    // Check for Capacitor mobile app schemes
+    if (origin.startsWith('capacitor://') || origin.startsWith('file://')) {
+      console.log('✅ Allowing mobile app origin:', origin);
+      return callback(null, true);
     }
     
     // Remove trailing slash for comparison
@@ -45,6 +79,7 @@ app.use(cors({
     const normalizedAllowedOrigins = allowedOrigins.map(o => o.replace(/\/$/, ''));
     
     if (normalizedAllowedOrigins.includes(normalizedOrigin)) {
+      console.log('✅ Allowing whitelisted origin:', origin);
       callback(null, true);
     } else {
       console.log('❌ Blocked by CORS:', origin);
@@ -56,7 +91,11 @@ app.use(cors({
       callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: true
+  credentials: true,
+  // Allow additional headers that mobile apps might send
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  // Allow additional methods for mobile apps
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH']
 }));
 app.use(morgan('combined'));
 app.use(express.json());

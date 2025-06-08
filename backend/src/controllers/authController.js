@@ -72,6 +72,68 @@ class AuthController {
     }
   }
 
+  // Handle mobile Google OAuth (from @capacitor-community/google-auth)
+  async googleMobileAuth(req, res) {
+    try {
+      const { accessToken, idToken, email, name, imageUrl } = req.body;
+
+      if (!accessToken) {
+        return res.status(400).json({ 
+          error: 'Access token required',
+          message: 'No access token provided from mobile app' 
+        });
+      }
+
+      // Verify the token with Google
+      const userInfo = await googleAuthService.getUserInfo(accessToken);
+      
+      // Additional validation: ensure the token is valid and matches the provided info
+      if (email && userInfo.email !== email) {
+        return res.status(400).json({ 
+          error: 'Token validation failed',
+          message: 'Email mismatch between token and provided data' 
+        });
+      }
+
+      // Create minimal tokens object for mobile auth
+      const tokens = {
+        access_token: accessToken,
+        refresh_token: null, // Mobile tokens are handled by the app
+        expires_in: 3600, // 1 hour default
+        token_type: 'Bearer'
+      };
+
+      // Create or update user
+      const user = await googleAuthService.createOrUpdateUser(userInfo, tokens, {
+        isAdditionalAccount: false,
+        mobileAuth: true
+      });
+      
+      // Generate JWT tokens for our backend
+      const jwtAccessToken = generateToken(user.id);
+      const jwtRefreshToken = generateRefreshToken(user.id);
+
+      res.json({
+        success: true,
+        accessToken: jwtAccessToken,
+        refreshToken: jwtRefreshToken,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          avatar: user.avatar
+        },
+        message: 'Mobile authentication successful'
+      });
+    } catch (error) {
+      console.error('Error in mobile Google auth:', error);
+      res.status(500).json({ 
+        error: 'Mobile authentication failed',
+        message: error.message 
+      });
+    }
+  }
+
   // Get current user profile
   async getProfile(req, res) {
     try {

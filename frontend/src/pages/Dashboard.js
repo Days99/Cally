@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
+import { App } from '@capacitor/app';
 import { useAuth } from '../hooks/useAuth';
 import { useNotifications } from '../components/NotificationSystem';
 import calendarService from '../services/calendarService';
@@ -20,10 +22,45 @@ const Dashboard = () => {
   const [eventStats, setEventStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [appInfo, setAppInfo] = useState(null);
+  const [mobileFeatures, setMobileFeatures] = useState({
+    isNative: false,
+    isPWA: false,
+    hasOfflineSupport: false,
+    canInstall: false
+  });
 
   useEffect(() => {
     loadDashboardData();
+    detectMobileFeatures();
   }, []);
+
+  const detectMobileFeatures = async () => {
+    try {
+      const isNative = Capacitor.isNativePlatform();
+      const isPWA = window.matchMedia('(display-mode: standalone)').matches || 
+                   window.navigator.standalone === true;
+      const hasOfflineSupport = 'serviceWorker' in navigator && 
+                               await navigator.serviceWorker.getRegistration();
+      const canInstall = window.deferredPrompt !== undefined;
+
+      let appInfoData = null;
+      if (isNative) {
+        appInfoData = await App.getInfo();
+      }
+
+      setMobileFeatures({
+        isNative,
+        isPWA,
+        hasOfflineSupport: !!hasOfflineSupport,
+        canInstall
+      });
+      
+      setAppInfo(appInfoData);
+    } catch (error) {
+      console.error('Error detecting mobile features:', error);
+    }
+  };
 
   const loadDashboardData = async () => {
     try {
@@ -118,7 +155,7 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Welcome Header */}
+      {/* Welcome Header with Mobile Status */}
       <div className="bg-gradient-to-r from-primary-600 to-primary-700 dark:from-primary-500 dark:to-primary-600 rounded-xl p-6 text-white shadow-colored animate-slide-up">
         <div className="flex items-center mb-4">
           <div className="animate-float">
@@ -128,13 +165,123 @@ const Dashboard = () => {
               className="h-12 w-12 mr-4 drop-shadow-lg"
             />
           </div>
-          <div>
+          <div className="flex-1">
             <h1 className="text-3xl font-bold">
               Welcome back, {user?.name || 'User'}! 👋
             </h1>
             <p className="text-primary-100 mt-1">
               Your unified calendar and task management dashboard
             </p>
+            
+            {/* Mobile Phase Badge */}
+            <div className="flex items-center mt-3 space-x-2">
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+                📱 Phase 10: Mobile Ready
+              </span>
+              
+              {mobileFeatures.isNative && (
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                  🚀 Native App
+                </span>
+              )}
+              
+              {mobileFeatures.isPWA && (
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+                  ⚡ PWA Mode
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Features Status */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 animate-slide-up" style={{ animationDelay: '0.1s' }}>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center">
+          📱 Mobile Application Status
+        </h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Platform Detection */}
+          <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Platform</span>
+              <div className={`w-3 h-3 rounded-full ${mobileFeatures.isNative ? 'bg-green-500' : 'bg-blue-500'}`}></div>
+            </div>
+            <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              {mobileFeatures.isNative ? 'Native Mobile' : 'Web Browser'}
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              {mobileFeatures.isNative ? `${Capacitor.getPlatform()} App` : 'Progressive Web App'}
+            </p>
+          </div>
+
+          {/* PWA Support */}
+          <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">PWA Support</span>
+              <div className={`w-3 h-3 rounded-full ${mobileFeatures.isPWA || mobileFeatures.hasOfflineSupport ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+            </div>
+            <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              {mobileFeatures.isPWA ? 'Active' : 'Available'}
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              {mobileFeatures.hasOfflineSupport ? 'Service Worker Ready' : 'Install Available'}
+            </p>
+          </div>
+
+          {/* Offline Support */}
+          <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Offline Mode</span>
+              <div className={`w-3 h-3 rounded-full ${mobileFeatures.hasOfflineSupport ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+            </div>
+            <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              {mobileFeatures.hasOfflineSupport ? 'Enabled' : 'Disabled'}
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Cached data available
+            </p>
+          </div>
+
+          {/* App Version */}
+          <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Version</span>
+              <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+            </div>
+            <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              {appInfo?.version || 'v1.0.0'}
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              {appInfo?.build || 'Development'}
+            </p>
+          </div>
+        </div>
+
+        {/* Mobile Phase Progress */}
+        <div className="mt-6 p-4 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 rounded-lg border border-green-200 dark:border-green-700">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+            🚧 Phase 10 Progress: Mobile Application Development
+          </h3>
+          
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-700 dark:text-gray-300">✅ Week 1-2: Mobile Framework Setup</span>
+              <span className="text-green-600 dark:text-green-400 font-medium">100%</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-700 dark:text-gray-300">🔨 Week 3-4: Native Features Integration</span>
+              <span className="text-yellow-600 dark:text-yellow-400 font-medium">In Progress</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-700 dark:text-gray-300">📱 Week 5-6: App Store Preparation</span>
+              <span className="text-gray-500 dark:text-gray-400 font-medium">Planned</span>
+            </div>
+          </div>
+          
+          <div className="mt-3 bg-white dark:bg-gray-800 rounded-full h-2">
+            <div className="bg-gradient-to-r from-green-500 to-blue-500 h-2 rounded-full" style={{ width: '45%' }}></div>
           </div>
         </div>
       </div>
@@ -142,7 +289,7 @@ const Dashboard = () => {
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Google Calendar Status */}
-        <div className="card-interactive animate-slide-up" style={{ animationDelay: '0.1s' }}>
+        <div className="card-interactive animate-slide-up" style={{ animationDelay: '0.2s' }}>
           <div className="card-header">
             <div className="flex items-center space-x-2">
               <span className="text-lg">📅</span>
@@ -165,7 +312,7 @@ const Dashboard = () => {
         </div>
 
         {/* Jira Tasks */}
-        <div className="card-interactive animate-slide-up" style={{ animationDelay: '0.2s' }}>
+        <div className="card-interactive animate-slide-up" style={{ animationDelay: '0.3s' }}>
           <div className="card-header">
             <div className="flex items-center space-x-2">
               <span className="text-lg">📋</span>
@@ -185,7 +332,7 @@ const Dashboard = () => {
         </div>
 
         {/* Manual Events */}
-        <div className="card-interactive animate-slide-up" style={{ animationDelay: '0.3s' }}>
+        <div className="card-interactive animate-slide-up" style={{ animationDelay: '0.4s' }}>
           <div className="card-header">
             <div className="flex items-center space-x-2">
               <span className="text-lg">✨</span>
@@ -206,12 +353,12 @@ const Dashboard = () => {
       </div>
 
       {/* TimeManager Widget */}
-      <div className="animate-slide-up" style={{ animationDelay: '0.4s' }}>
+      <div className="animate-slide-up" style={{ animationDelay: '0.5s' }}>
         <TimeManager />
       </div>
 
       {/* Integration Status */}
-      <div className="card animate-slide-up" style={{ animationDelay: '0.5s' }}>
+      <div className="card animate-slide-up" style={{ animationDelay: '0.6s' }}>
         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center">
           <span className="mr-2">📊</span>
           Integration Status
@@ -246,7 +393,7 @@ const Dashboard = () => {
       {/* Recent Events and Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Events */}
-        <div className="card animate-slide-up" style={{ animationDelay: '0.6s' }}>
+        <div className="card animate-slide-up" style={{ animationDelay: '0.7s' }}>
           <div className="card-header">
             <div className="flex items-center space-x-2">
               <span className="text-lg">🗓️</span>
@@ -301,7 +448,7 @@ const Dashboard = () => {
         </div>
 
         {/* Quick Actions */}
-        <div className="card animate-slide-up" style={{ animationDelay: '0.7s' }}>
+        <div className="card animate-slide-up" style={{ animationDelay: '0.8s' }}>
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center">
             <span className="mr-2">⚡</span>
             Quick Actions
@@ -373,7 +520,7 @@ const Dashboard = () => {
       </div>
 
       {/* Development Status */}
-      <div className="card animate-slide-up" style={{ animationDelay: '0.8s' }}>
+      <div className="card animate-slide-up" style={{ animationDelay: '0.9s' }}>
         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-6 flex items-center">
           <span className="mr-2">🚀</span>
           Development Progress
